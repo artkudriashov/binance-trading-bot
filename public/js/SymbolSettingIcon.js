@@ -13,7 +13,10 @@ class SymbolSettingIcon extends React.Component {
     this.state = {
       showSettingModal: false,
       showConfirmModal: false,
-      symbolConfiguration: {}
+      symbolConfiguration: {},
+      buyTriggerPrice: 0,
+      lastBuyPrice: 0,
+      sellTriggerPrice: 0,
     };
 
     this.handleModalShow = this.handleModalShow.bind(this);
@@ -296,7 +299,7 @@ class SymbolSettingIcon extends React.Component {
                                   <Popover id='buy-maximum-purchase-amount-overlay-right'>
                                     <Popover.Content>
                                       Set maximum purchase amount. i.e. if
-                                      account has 200 USDT and set as{' '}
+                                      account has 500 USDT and set as{' '}
                                       <code>100</code>, then when reach buy
                                       price, it will only buy <code>100</code>{' '}
                                       worth of the coin. Note that the bot will
@@ -366,6 +369,14 @@ class SymbolSettingIcon extends React.Component {
                               value={symbolConfiguration.buy.triggerPercentage}
                               onChange={this.handleInputChange}
                             />
+                            <Form.Text className='text-muted'>
+                              Set the trigger percentage for buying. i.e. if set{' '}
+                              <code>{symbolConfiguration.buy.triggerPercentage}</code> and the lowest price is <code>{symbolInfo.buy.lowestPrice}</code>,
+                              then the bot will buy the coin when the current price reaches{' '}
+                              <code>{this.state.buyTriggerPrice = (symbolInfo.buy.lowestPrice * symbolConfiguration.buy.triggerPercentage).toFixed(5)}</code>. If you set less than <code>1</code>,
+                              it can never reach the trigger price unless there is
+                              a deep decline before the next process.
+                            </Form.Text>
                           </Form.Group>
                           <Form.Group
                             controlId='field-buy-stop-percentage'
@@ -405,6 +416,11 @@ class SymbolSettingIcon extends React.Component {
                               value={symbolConfiguration.buy.stopPercentage}
                               onChange={this.handleInputChange}
                             />
+                            <Form.Text className='text-muted'>
+                              Set the percentage to calculate stop price. i.e. if set{' '}
+                              <code>{symbolConfiguration.buy.stopPercentage}</code> and buy trigger price <code>{this.state.buyTriggerPrice}</code>, stop
+                              price will be <code>{(this.state.buyTriggerPrice * symbolConfiguration.buy.stopPercentage).toFixed(5)}</code> for stop limit order.
+                            </Form.Text>
                           </Form.Group>
 
                           <Form.Group
@@ -445,6 +461,11 @@ class SymbolSettingIcon extends React.Component {
                               value={symbolConfiguration.buy.limitPercentage}
                               onChange={this.handleInputChange}
                             />
+                            <Form.Text className='text-muted'>
+                              Set the percentage to calculate limit price. i.e. if set{' '}
+                              <code>{symbolConfiguration.buy.limitPercentage}</code> and buy trigger price <code>{this.state.buyTriggerPrice}</code>, limit
+                              price will be <code>{(this.state.buyTriggerPrice * symbolConfiguration.buy.limitPercentage).toFixed(5)}</code> for stop limit order.
+                            </Form.Text>
                           </Form.Group>
                         </div>
                         <div className='col-xs-12 col-sm-6'>
@@ -525,6 +546,13 @@ class SymbolSettingIcon extends React.Component {
                               value={symbolConfiguration.sell.triggerPercentage}
                               onChange={this.handleInputChange}
                             />
+                            <Form.Text className='text-muted'>
+                              Set the trigger percentage for minimum profit. i.e. if set{' '}
+                              <code>{symbolConfiguration.sell.triggerPercentage}</code>, minimum profit will be <code>{(symbolConfiguration.sell.triggerPercentage * 100 - 100).toFixed(2)}%</code>. So
+                              if the last buy price is <code>{this.state.lastBuyPrice = (symbolInfo.sell.lastBuyPrice || this.state.buyTriggerPrice)}</code>, then the bot will
+                              sell the coin when the current price reaches <code>{this.state.sellTriggerPrice = (this.state.lastBuyPrice * symbolConfiguration.sell.triggerPercentage).toFixed(5)}</code>
+                              .
+                            </Form.Text>
                           </Form.Group>
                           <Form.Group
                             controlId='field-sell-stop-percentage'
@@ -564,6 +592,11 @@ class SymbolSettingIcon extends React.Component {
                               value={symbolConfiguration.sell.stopPercentage}
                               onChange={this.handleInputChange}
                             />
+                            <Form.Text className='text-muted'>
+                              Set the percentage to calculate stop price. i.e. if set{' '}
+                              <code>{symbolConfiguration.sell.stopPercentage}</code> and sell trigger price <code>{this.state.sellTriggerPrice}</code>, stop
+                              price will be <code>{(symbolConfiguration.sell.stopPercentage * this.state.sellTriggerPrice).toFixed(5)}</code> for stop limit order.
+                            </Form.Text>
                           </Form.Group>
                           <Form.Group
                             controlId='field-sell-limit-percentage'
@@ -603,6 +636,11 @@ class SymbolSettingIcon extends React.Component {
                               value={symbolConfiguration.sell.limitPercentage}
                               onChange={this.handleInputChange}
                             />
+                            <Form.Text className='text-muted'>
+                              Set the percentage to calculate limit price. i.e. if set{' '}
+                              <code>{symbolConfiguration.sell.limitPercentage}</code> and sell trigger price <code>{this.state.sellTriggerPrice}</code>, limit
+                              price will be <code>{(symbolConfiguration.sell.limitPercentage * this.state.sellTriggerPrice).toFixed(5)}</code> for stop limit order.
+                            </Form.Text>
                           </Form.Group>
                           <p className='form-header mb-1'>Sell - Stop-Loss</p>
                           <Form.Group
@@ -690,6 +728,13 @@ class SymbolSettingIcon extends React.Component {
                               }
                               onChange={this.handleInputChange}
                             />
+                            <Form.Text className='text-muted'>
+                              Set maximum loss percentage for stop-loss. i.e. if set
+                              <code> {symbolConfiguration.sell.stopLoss.maxLossPercentage}</code>, it means you won't lose than <code>{((1 - symbolConfiguration.sell.stopLoss.maxLossPercentage) * 100).toFixed(2)}%</code> of
+                              the last buy price. When you purchased the coin at <code>{this.state.lastBuyPrice}</code>. And then when the current price reaches{' '}
+                              <code>{(symbolConfiguration.sell.stopLoss.maxLossPercentage * this.state.lastBuyPrice).toFixed(5)}</code>, the bot will place the{' '} <strong>market order</strong> to sell all
+                              available balance.
+                            </Form.Text>
                           </Form.Group>
                           <Form.Group
                             controlId='field-sell-stop-loss-disable-buy-minutes'

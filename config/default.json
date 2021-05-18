@@ -1,6 +1,6 @@
 {
   "mode": "test",
-  "tz": "Australia/Melbourne",
+  "tz": "Europe/Kiev",
   "binance": {
     "live": {
       "apiKey": "",
