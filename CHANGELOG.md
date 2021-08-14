@@ -2,10 +2,68 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## [0.0.75] - 2021-08-13
 
-- Added `docker-stack.yml` for the Portainer -
-  [@hipposen](https://github.com/hipposen)
+- Support triggering buy automatically after configured minutes
+- Support triggering grid trade for selling manually
+- Save trades when the last buy price is removed
+- Display closed trades history - [#160](https://github.com/chrisleekr/binance-trading-bot/issues/160)
+- Display closed trades profit
+- Support deleting trade history
+- Support ARM/v7 (Raspberry Pi 4 32bit) docker image in the DockerHub
+
+## [0.0.74] - 2021-08-01
+
+- Secure frontend with the password authentication. Thanks [@pedrohusky](https://github.com/pedrohusky) - [#240](https://github.com/chrisleekr/binance-trading-bot/pull/240)
+- Show badge for the customised symbol configuration by  [@habibalkhabbaz](https://github.com/habibalkhabbaz) - [#258](https://github.com/chrisleekr/binance-trading-bot/pull/258)
+- Filter symbols in the frontend. Thanks [@pedrohusky](https://github.com/pedrohusky) - [#120](https://github.com/chrisleekr/binance-trading-bot/issues/120) [#242](https://github.com/chrisleekr/binance-trading-bot/pull/242)
+
+## [0.0.73] - 2021-07-29
+
+- Make the local tunnel to be disabled by default. Thanks [@pedrohusky](https://github.com/pedrohusky)
+- Support Grid strategy for buy/sell to mitigate loss/increasing profit - [#158](https://github.com/chrisleekr/binance-trading-bot/issues/158)
+- Add frontend option to disable sorting or improve sorting - [#244](https://github.com/chrisleekr/binance-trading-bot/issues/244)
+
+## [0.0.72] - 2021-07-07
+
+- Support ATH buy restriction by [@habibalkhabbaz](https://github.com/habibalkhabbaz) - [#82](https://github.com/chrisleekr/binance-trading-bot/issues/82)
+- Support last buy price removing threshold by [@pedrohusky](https://github.com/pedrohusky) - [#190](https://github.com/chrisleekr/binance-trading-bot/issues/190)
+
+## [0.0.71] - 2021-06-14
+
+- Fixed the issue with dust transfer
+
+## [0.0.70] - 2021-06-14
+
+- Support manual trade for all symbols -  [#100](https://github.com/chrisleekr/binance-trading-bot/issues/100)
+- Configured Redis password
+- Support converting small balances to BNB -  [#100](https://github.com/chrisleekr/binance-trading-bot/issues/100)
+
+## [0.0.69] - 2021-06-05
+
+- Fixed typo issue with CANCELED manual order handling
+
+## [0.0.68] - 2021-06-05
+
+- Fixed the issue with the order not found error for the manual order
+
+## [0.0.67] - 2021-06-05
+
+- Add Chinese translation of readme by [@izayl](https://github.com/izayl) - [#205](https://github.com/chrisleekr/binance-trading-bot/pull/205)
+- Support manual trade - [#100](https://github.com/chrisleekr/binance-trading-bot/issues/100)
+
+## [0.0.66] - 2021-05-21
+
+- Updated frontend to display version - [#59](https://github.com/chrisleekr/binance-trading-bot/issues/59)
+- Support monitoring multiple coins simultaneously - [#77](https://github.com/chrisleekr/binance-trading-bot/pull/77)
+- Added `docker-stack.yml` for the Portainer - [@hipposen](https://github.com/hipposen)
+- Fixed precision issues for some FIAT - [#90](https://github.com/chrisleekr/binance-trading-bot/issues/90)
+- Improved frontend & settings UI - [#93](https://github.com/chrisleekr/binance-trading-bot/issues/93) [#85](https://github.com/chrisleekr/binance-trading-bot/issues/85)
+- Support all symbols - [#104](https://github.com/chrisleekr/binance-trading-bot/issues/104)
+- Added stop loss feature - [#99](https://github.com/chrisleekr/binance-trading-bot/issues/99)
+- Stabilised Local Tunnel, cronjob and Binance WebSocket
+- Prevented to place new order when the API limit reached - [#163](https://github.com/chrisleekr/binance-trading-bot/issues/163)
+- Added NPM task for building docker image on Windows by [@garyng](https://github.com/garyng) - [#175](https://github.com/chrisleekr/binance-trading-bot/pull/175)
 
 ## [0.0.65] - 2021-03-27
 

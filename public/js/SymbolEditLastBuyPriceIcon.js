@@ -32,12 +32,16 @@ class SymbolEditLastBuyPriceIcon extends React.Component {
 
   handleFormSubmit(e) {
     e.preventDefault();
-    console.log(
-      'handleFormSubmit this.state.symbolInfo ',
-      this.state.symbolInfo
-    );
 
-    this.props.sendWebSocket('symbol-update', this.state.symbolInfo);
+    const {
+      symbol,
+      sell: { lastBuyPrice }
+    } = this.state.symbolInfo;
+
+    this.props.sendWebSocket('symbol-update-last-buy-price', {
+      symbol,
+      sell: { lastBuyPrice }
+    });
     this.handleModalClose();
   }
 
@@ -71,8 +75,12 @@ class SymbolEditLastBuyPriceIcon extends React.Component {
   }
 
   render() {
-    const { symbolInfo } = this.state;
+    const { isAuthenticated } = this.props;
+    if (isAuthenticated === false) {
+      return '';
+    }
 
+    const { symbolInfo } = this.state;
     if (_.isEmpty(symbolInfo)) {
       return '';
     }
@@ -83,15 +91,14 @@ class SymbolEditLastBuyPriceIcon extends React.Component {
           type='button'
           className='btn btn-sm btn-link p-0'
           onClick={this.handleModalShow}>
-          <i className='fa fa-edit'></i>
+          <i className='fas fa-edit fa-sm'></i>
         </button>
-        <Modal
-          show={this.state.showModal}
-          onHide={this.handleModalClose}
-          size='sm'>
+        <Modal show={this.state.showModal} onHide={this.handleModalClose}>
           <Form onSubmit={this.handleFormSubmit}>
             <Modal.Header className='pt-1 pb-1'>
-              <Modal.Title>Edit Last Buy Price</Modal.Title>
+              <Modal.Title>
+                Edit Last Buy Price for {symbolInfo.symbol}
+              </Modal.Title>
             </Modal.Header>
             <Modal.Body>
               <h2 className='form-header'>Sell Signal</h2>
@@ -103,7 +110,7 @@ class SymbolEditLastBuyPriceIcon extends React.Component {
                   placeholder='Enter last buy price'
                   required
                   min='0'
-                  step='0.000001'
+                  step='0.00000001'
                   data-state-key='sell.lastBuyPrice'
                   defaultValue={symbolInfo.sell.lastBuyPrice}
                   onChange={this.handleInputChange}

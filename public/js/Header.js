@@ -4,11 +4,16 @@
 class Header extends React.Component {
   render() {
     const {
+      isAuthenticated,
       configuration,
       publicURL,
       sendWebSocket,
       exchangeSymbols,
-      exchangeFIATs
+      availableSortOptions,
+      selectedSortOption,
+      searchKeyword,
+      setSortOption,
+      setSearchKeyword
     } = this.props;
 
     return (
@@ -21,17 +26,26 @@ class Header extends React.Component {
                 className='binance-img'
                 alt='Binance logo'
               />{' '}
-              Binance Auto Trading Bot
+              Binance Trading Bot
             </h1>
           </div>
           <div className='header-column header-column-icon'>
+            <FilterIcon
+              availableSortOptions={availableSortOptions}
+              selectedSortOption={selectedSortOption}
+              searchKeyword={searchKeyword}
+              setSortOption={setSortOption}
+              setSearchKeyword={setSearchKeyword}
+              isAuthenticated={isAuthenticated}
+            />
+
             <div className='header-column-icon-wrapper github-wrapper'>
               <a
                 href='https://github.com/chrisleekr/binance-trading-bot'
                 target='_blank'
                 className='btn btn-sm p-0 pl-1 pr-1'
                 rel='noreferrer'>
-                <i className='fa fa-github'></i>
+                <i className='fab fa-github'></i>
               </a>
             </div>
 
@@ -43,7 +57,7 @@ class Header extends React.Component {
                   target='_blank'
                   rel='noreferrer'
                   title={publicURL}>
-                  <i className='fa fa-link'></i>
+                  <i className='fas fa-link'></i>
                 </a>
               </div>
             ) : (
@@ -52,13 +66,18 @@ class Header extends React.Component {
             {_.isEmpty(configuration) === false ? (
               <SettingIcon
                 exchangeSymbols={exchangeSymbols}
-                exchangeFIATs={exchangeFIATs}
                 configuration={configuration}
                 sendWebSocket={sendWebSocket}
+                isAuthenticated={isAuthenticated}
               />
             ) : (
               ''
             )}
+            <LockIcon isAuthenticated={isAuthenticated} />
+            <UnlockIcon
+              sendWebSocket={sendWebSocket}
+              isAuthenticated={isAuthenticated}
+            />
           </div>
         </div>
       </div>

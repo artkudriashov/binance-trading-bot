@@ -5,14 +5,21 @@ const clusterUrl = `${config.get('mongo.host')}:${config.get('mongo.port')}`;
 
 const uri = `mongodb://${clusterUrl}/?poolSize=20&retryWrites=true&writeConcern=majority`;
 
-const client = new MongoClient(uri, { useUnifiedTopology: true });
+const client = new MongoClient(uri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+});
 
 let database;
 
+/**
+ * Connect to MongoDB
+ *
+ * @param {*} funcLogger
+ */
 const connect = async funcLogger => {
   const logger = funcLogger.child({ helper: 'mongo' });
   logger.info({ uri }, 'Connecting mongodb');
-
   try {
     await client.connect();
 
@@ -26,6 +33,61 @@ const connect = async funcLogger => {
   }
 };
 
+/**
+ * Find all
+ *
+ * @param {*} funcLogger
+ * @param {*} collectionName
+ * @param {*} query
+ * @param {*} params
+ *
+ * @returns
+ */
+const findAll = async (funcLogger, collectionName, query, params = {}) => {
+  const logger = funcLogger.child({ helper: 'mongo', funcName: 'findAll' });
+
+  const collection = database.collection(collectionName);
+
+  logger.info({ query, params }, 'Finding document from MongoDB');
+
+  const result = await collection.find(query, params).toArray();
+
+  logger.info({ result }, 'Found documents from MongoDB');
+
+  return result;
+};
+
+/**
+ * Agreegate result with pagination
+ *
+ * @param {*} funcLogger
+ * @param {*} collectionName
+ * @param {*} query
+ * @returns
+ */
+const aggregate = async (funcLogger, collectionName, query) => {
+  const logger = funcLogger.child({ helper: 'mongo', funcName: 'aggregate' });
+
+  const collection = database.collection(collectionName);
+
+  logger.info({ query }, 'Finding document from MongoDB');
+
+  const result = await collection.aggregate(query).toArray();
+
+  logger.info({ result }, 'Found documents from MongoDB');
+
+  return result;
+};
+
+/**
+ * Find one row
+ *
+ * @param {*} funcLogger
+ * @param {*} collectionName
+ * @param {*} query
+ *
+ * @returns
+ */
 const findOne = async (funcLogger, collectionName, query) => {
   const logger = funcLogger.child({ helper: 'mongo', funcName: 'findOne' });
 
@@ -38,6 +100,15 @@ const findOne = async (funcLogger, collectionName, query) => {
   return result;
 };
 
+/**
+ * Insert one row
+ *
+ * @param {*} funcLogger
+ * @param {*} collectionName
+ * @param {*} document
+ *
+ * @returns
+ */
 const insertOne = async (funcLogger, collectionName, document) => {
   const logger = funcLogger.child({ helper: 'mongo', funcName: 'insertOne' });
 
@@ -50,6 +121,16 @@ const insertOne = async (funcLogger, collectionName, document) => {
   return result;
 };
 
+/**
+ * Upsert one row
+ *
+ * @param {*} funcLogger
+ * @param {*} collectionName
+ * @param {*} filter
+ * @param {*} document
+ *
+ * @returns
+ */
 const upsertOne = async (funcLogger, collectionName, filter, document) => {
   const logger = funcLogger.child({ helper: 'mongo', funcName: 'upsertOne' });
 
@@ -69,6 +150,15 @@ const upsertOne = async (funcLogger, collectionName, filter, document) => {
   return result;
 };
 
+/**
+ * Delete all rows
+ *
+ * @param {*} funcLogger
+ * @param {*} collectionName
+ * @param {*} filter
+ *
+ * @returns
+ */
 const deleteAll = async (funcLogger, collectionName, filter) => {
   const logger = funcLogger.child({ helper: 'mongo', funcName: 'deleteAll' });
 
@@ -80,6 +170,15 @@ const deleteAll = async (funcLogger, collectionName, filter) => {
   return result;
 };
 
+/**
+ * Delete one row
+ *
+ * @param {*} funcLogger
+ * @param {*} collectionName
+ * @param {*} filter
+ *
+ * @returns
+ */
 const deleteOne = async (funcLogger, collectionName, filter) => {
   const logger = funcLogger.child({ helper: 'mongo', funcName: 'deleteOne' });
 
@@ -92,7 +191,10 @@ const deleteOne = async (funcLogger, collectionName, filter) => {
 };
 
 module.exports = {
+  client,
   connect,
+  findAll,
+  aggregate,
   findOne,
   insertOne,
   upsertOne,

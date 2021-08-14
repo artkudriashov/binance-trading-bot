@@ -11,20 +11,34 @@ class CoinWrapperSymbol extends React.Component {
   }
 
   render() {
-    const { symbolInfo, sendWebSocket } = this.props;
+    const {
+      symbol,
+      symbolInfo,
+      lastCandle,
+      quoteAsset,
+      baseAssetPrecision,
+      quotePrecision,
+      filterLotSize,
+      filterPrice,
+      baseAssetStepSize,
+      quoteAssetTickSize,
+      baseAssetBalance,
+      quoteAssetBalance,
+      configuration: globalConfiguration,
+      sendWebSocket,
+      isAuthenticated
+    } = this.props;
 
     return (
       <div className='coin-info-sub-wrapper coin-info-sub-wrapper-symbol'>
         <div className='coin-info-column coin-info-column-name'>
           <a
-            href={`https://www.binance.com/en/trade/${symbolInfo.symbol}?layout=pro`}
+            href={`https://www.binance.com/en/trade/${symbol}?layout=pro`}
             target='_blank'
             rel='noreferrer'
             className='coin-symbol'>
-            {symbolInfo.symbol}
+            {symbol}
           </a>
-        </div>
-        <div className='coin-info-column coin-info-column-icon'>
           {this.isMonitoring() && (
             <Spinner
               animation='border'
@@ -32,9 +46,40 @@ class CoinWrapperSymbol extends React.Component {
               className='coin-info-spinner'
             />
           )}
+        </div>
+        <div className='coin-info-column coin-info-column-icon'>
+          <SymbolManualTradeIcon
+            symbol={symbol}
+            lastCandle={lastCandle}
+            baseAssetPrecision={baseAssetPrecision}
+            quotePrecision={quotePrecision}
+            filterLotSize={filterLotSize}
+            filterPrice={filterPrice}
+            baseAssetStepSize={baseAssetStepSize}
+            quoteAssetTickSize={quoteAssetTickSize}
+            baseAssetBalance={baseAssetBalance}
+            quoteAssetBalance={quoteAssetBalance}
+            sendWebSocket={sendWebSocket}
+            isAuthenticated={isAuthenticated}
+          />
+
+          <SymbolGridTradeArchiveIcon
+            symbol={symbol}
+            quoteAsset={quoteAsset}
+            quoteAssetTickSize={quoteAssetTickSize}
+            isAuthenticated={isAuthenticated}
+          />
+
+          <SymbolSettingIcon
+            symbolInfo={symbolInfo}
+            globalConfiguration={globalConfiguration}
+            sendWebSocket={sendWebSocket}
+            isAuthenticated={isAuthenticated}
+          />
           <SymbolDeleteIcon
             symbolInfo={symbolInfo}
             sendWebSocket={sendWebSocket}
+            isAuthenticated={isAuthenticated}
           />
         </div>
       </div>

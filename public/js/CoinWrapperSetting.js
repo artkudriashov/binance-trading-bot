@@ -17,68 +17,121 @@ class CoinWrapperSetting extends React.Component {
     });
   }
 
-  objectDiff = (a, b) =>
-    _.fromPairs(_.differenceWith(_.toPairs(a), _.toPairs(b), _.isEqual));
+  isCustomised = configurationKeyName =>
+    configurationKeyName !== 'configuration';
 
   render() {
     const { collapsed } = this.state;
-    const {
-      symbolInfo,
-      configuration: globalConfiguration,
-      sendWebSocket
-    } = this.props;
+    const { symbolInfo } = this.props;
     const { symbolConfiguration } = symbolInfo;
 
-    // Find out difference between global and symbol configuration. Using this to show overriden values.
-    const diffConfiguration = _.pick(
-      this.objectDiff(symbolConfiguration, globalConfiguration),
-      ['candles', 'buy', 'sell']
-    );
+    const {
+      symbol,
+      quoteAssetBalance: { asset: quoteAsset }
+    } = symbolInfo;
 
-    if (_.isEmpty(diffConfiguration)) {
+    const {
+      key: configurationKeyName,
+      buy: { gridTrade: buyGridTrade },
+      sell: { gridTrade: sellGridTrade }
+    } = symbolConfiguration;
+
+    const buyGridRows = buyGridTrade.map((grid, i) => {
       return (
-        <div className='coin-info-sub-wrapper coin-info-sub-wrapper-setting'>
-          <div className='coin-info-column coin-info-column-title coin-info-column-title-setting'>
-            <div className='coin-info-label'>
-              <div className='mr-1'>Setting - Global</div>
-              <SymbolSettingIcon
-                symbolInfo={symbolInfo}
-                globalConfiguration={globalConfiguration}
-                sendWebSocket={sendWebSocket}
-              />
+        <React.Fragment
+          key={'coin-wrapper-setting-buy-grid-row-' + symbol + '-' + i}>
+          <div className='coin-info-column-grid'>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Grid Trade #{i + 1}</span>
             </div>
-            <button
-              type='button'
-              className='btn btn-sm btn-link p-0 ml-1'
-              onClick={this.toggleCollapse}>
-              <i
-                className={`fa ${
-                  collapsed ? 'fa-arrow-right' : 'fa-arrow-down'
-                }`}></i>
-            </button>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>
+                Trigger percentage{' '}
+                <strong>
+                  {i === 0 ? `(lowest price)` : `(last buy price)`}
+                </strong>
+                :
+              </span>
+              <div className='coin-info-value'>
+                {(parseFloat(grid.triggerPercentage - 1) * 100).toFixed(2)}%
+              </div>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Stop percentage:</span>
+              <div className='coin-info-value'>
+                {(parseFloat(grid.stopPercentage - 1) * 100).toFixed(2)}%
+              </div>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Limit percentage:</span>
+              <div className='coin-info-value'>
+                {(parseFloat(grid.limitPercentage - 1) * 100).toFixed(2)}%
+              </div>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Max purchase amount:</span>
+              <div className='coin-info-value'>
+                {grid.maxPurchaseAmount} {quoteAsset}
+              </div>
+            </div>
           </div>
-          <div
-            className={`coin-info-content-setting coin-info-column coin-info-column-message ${
-              collapsed ? 'd-none' : ''
-            }`}>
-            This symbol is monitoring with global setting.
-          </div>
-        </div>
+        </React.Fragment>
       );
-    }
+    });
+
+    const sellGridRows = sellGridTrade.map((grid, i) => {
+      return (
+        <React.Fragment
+          key={'coin-wrapper-setting-sell-grid-row-' + symbol + '-' + i}>
+          <div className='coin-info-column-grid'>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Grid Trade #{i + 1}</span>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Trigger percentage:</span>
+              <div className='coin-info-value'>
+                {(parseFloat(grid.triggerPercentage - 1) * 100).toFixed(2)}%
+              </div>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Stop percentage:</span>
+              <div className='coin-info-value'>
+                {(parseFloat(grid.stopPercentage - 1) * 100).toFixed(2)}%
+              </div>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Limit percentage:</span>
+              <div className='coin-info-value'>
+                {(parseFloat(grid.limitPercentage - 1) * 100).toFixed(2)}%
+              </div>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Quantity Percentage:</span>
+              <div className='coin-info-value'>
+                {(parseFloat(grid.quantityPercentage) * 100).toFixed(2)}%
+              </div>
+            </div>
+          </div>
+        </React.Fragment>
+      );
+    });
+
     return (
       <div className='coin-info-sub-wrapper coin-info-sub-wrapper-setting'>
         <div className='coin-info-column coin-info-column-title coin-info-column-title-setting'>
           <div className='coin-info-label'>
             <div className='mr-1'>
-              Setting -{' '}
-              <span className='coin-setting-customised'>Customised</span>
+              Setting{' '}
+              {this.isCustomised(configurationKeyName) ? (
+                <Badge pill variant='warning'>
+                  Customised
+                </Badge>
+              ) : (
+                <Badge pill variant='light'>
+                  Global
+                </Badge>
+              )}
             </div>
-            <SymbolSettingIcon
-              symbolInfo={symbolInfo}
-              globalConfiguration={globalConfiguration}
-              sendWebSocket={sendWebSocket}
-            />
           </div>
 
           <button
@@ -86,176 +139,179 @@ class CoinWrapperSetting extends React.Component {
             className='btn btn-sm btn-link p-0 ml-1'
             onClick={this.toggleCollapse}>
             <i
-              className={`fa ${
+              className={`fas ${
                 collapsed ? 'fa-arrow-right' : 'fa-arrow-down'
               }`}></i>
           </button>
         </div>
         <div
           className={`coin-info-content-setting ${collapsed ? 'd-none' : ''}`}>
-          {_.get(diffConfiguration, 'candles') ? (
-            <div className='coin-info-sub-wrapper'>
-              <span className='coin-info-sub-label'>Candles</span>
-              {_.get(diffConfiguration, 'candles.interval') ? (
-                <div className='coin-info-column coin-info-column-order'>
-                  <span className='coin-info-label'>Interval:</span>
-                  <HightlightChange className='coin-info-value'>
-                    {diffConfiguration.candles.interval}
-                  </HightlightChange>
-                </div>
-              ) : (
-                ''
-              )}
-              {_.get(diffConfiguration, 'candles.limit') ? (
-                <div className='coin-info-column coin-info-column-order'>
-                  <span className='coin-info-label'>Limit:</span>
-                  <HightlightChange className='coin-info-value'>
-                    {diffConfiguration.candles.limit}
-                  </HightlightChange>
-                </div>
-              ) : (
-                ''
-              )}
+          <div className='coin-info-sub-wrapper'>
+            <div className='coin-info-sub-label'>Candles</div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Interval:</span>
+              <div className='coin-info-value'>
+                {symbolConfiguration.candles.interval}
+              </div>
             </div>
-          ) : (
-            ''
-          )}
-
-          {_.get(diffConfiguration, 'buy') ? (
-            <div className='coin-info-sub-wrapper'>
-              <span className='coin-info-sub-label'>Buy</span>
-              {_.get(diffConfiguration, 'buy.enabled') !== undefined ? (
-                <div className='coin-info-column coin-info-column-order'>
-                  <span className='coin-info-label'>Trading enabled:</span>
-                  <span className='coin-info-value'>
-                    {diffConfiguration.buy.enabled ? (
-                      <i className='fa fa-toggle-on'></i>
-                    ) : (
-                      <i className='fa fa-toggle-off'></i>
-                    )}
-                  </span>
-                </div>
-              ) : (
-                ''
-              )}
-
-              {_.get(diffConfiguration, 'buy.maxPurchaseAmount') ? (
-                <div className='coin-info-column coin-info-column-order'>
-                  <span className='coin-info-label'>
-                    Maximum purchase amount:
-                  </span>
-                  <HightlightChange className='coin-info-value'>
-                    {diffConfiguration.buy.maxPurchaseAmount}
-                  </HightlightChange>
-                </div>
-              ) : (
-                ''
-              )}
-
-              {_.get(diffConfiguration, 'buy.triggerPercentage') ? (
-                <div className='coin-info-column coin-info-column-order'>
-                  <span className='coin-info-label'>Trigger percentage:</span>
-                  <HightlightChange className='coin-info-value'>
-                    {(
-                      (symbolConfiguration.buy.triggerPercentage - 1) *
-                      100
-                    ).toFixed(2)}
-                    %
-                  </HightlightChange>
-                </div>
-              ) : (
-                ''
-              )}
-
-              {_.get(diffConfiguration, 'buy.stopPercentage') ? (
-                <div className='coin-info-column coin-info-column-order'>
-                  <span className='coin-info-label'>Stop percentage:</span>
-                  <HightlightChange className='coin-info-value'>
-                    {(
-                      (symbolConfiguration.buy.stopPercentage - 1) *
-                      100
-                    ).toFixed(2)}
-                    %
-                  </HightlightChange>
-                </div>
-              ) : (
-                ''
-              )}
-
-              {_.get(diffConfiguration, 'buy.limitPercentage') ? (
-                <div className='coin-info-column coin-info-column-order'>
-                  <span className='coin-info-label'>Limit percentage:</span>
-                  <HightlightChange className='coin-info-value'>
-                    {(
-                      (symbolConfiguration.buy.limitPercentage - 1) *
-                      100
-                    ).toFixed(2)}
-                    %
-                  </HightlightChange>
-                </div>
-              ) : (
-                ''
-              )}
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Limit:</span>
+              <div className='coin-info-value'>
+                {symbolConfiguration.candles.limit}
+              </div>
             </div>
-          ) : (
-            ''
-          )}
+          </div>
 
-          {_.get(diffConfiguration, 'sell') ? (
-            <div className='coin-info-sub-wrapper'>
-              <span className='coin-info-sub-label'>Sell</span>
-              {_.get(diffConfiguration, 'sell.enabled') !== undefined ? (
-                <div className='coin-info-column coin-info-column-order'>
-                  <span className='coin-info-label'>Trading enabled:</span>
-                  <span className='coin-info-value'>
-                    {diffConfiguration.sell.enabled ? (
-                      <i className='fa fa-toggle-on'></i>
-                    ) : (
-                      <i className='fa fa-toggle-off'></i>
-                    )}
-                  </span>
-                </div>
-              ) : (
-                ''
-              )}
-              {_.get(diffConfiguration, 'sell.triggerPercentage') ? (
-                <div className='coin-info-column coin-info-column-order'>
-                  <span className='coin-info-label'>Trigger percentage:</span>
-                  <HightlightChange className='coin-info-value'>
-                    {diffConfiguration.sell.triggerPercentage}
-                  </HightlightChange>
-                </div>
-              ) : (
-                ''
-              )}
-              {_.get(diffConfiguration, 'sell.stopPercentage') ? (
-                <div className='coin-info-column coin-info-column-order'>
-                  <span className='coin-info-label'>
-                    Stop price percentage:
-                  </span>
-                  <HightlightChange className='coin-info-value'>
-                    {diffConfiguration.sell.stopPercentage}
-                  </HightlightChange>
-                </div>
-              ) : (
-                ''
-              )}
-              {_.get(diffConfiguration, 'sell.limitPercentage') ? (
-                <div className='coin-info-column coin-info-column-order'>
-                  <span className='coin-info-label'>
-                    Limit price percentage:
-                  </span>
-                  <HightlightChange className='coin-info-value'>
-                    {diffConfiguration.sell.limitPercentage}
-                  </HightlightChange>
-                </div>
-              ) : (
-                ''
-              )}
+          <div className='coin-info-sub-wrapper'>
+            <div className='coin-info-sub-label'>Buy</div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Trading enabled:</span>
+              <span className='coin-info-value'>
+                {symbolConfiguration.buy.enabled ? (
+                  <i className='fas fa-toggle-on'></i>
+                ) : (
+                  <i className='fas fa-toggle-off'></i>
+                )}
+              </span>
             </div>
-          ) : (
-            ''
-          )}
+            {buyGridRows}
+          </div>
+          <div className='coin-info-sub-wrapper'>
+            <div className='coin-info-sub-label'>
+              Buy - Last buy price removal threshold
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>
+                Remove last buy price under:
+              </span>
+              <div className='coin-info-value'>
+                {symbolConfiguration.buy.lastBuyPriceRemoveThreshold}{' '}
+                {quoteAsset}
+              </div>
+            </div>
+          </div>
+          <div className='coin-info-sub-wrapper'>
+            <div className='coin-info-sub-label'>
+              Buy - Restriction with ATH
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Restriction Enabled:</span>
+              <span className='coin-info-value'>
+                {symbolConfiguration.buy.athRestriction.enabled ? (
+                  <i className='fas fa-toggle-on'></i>
+                ) : (
+                  <i className='fas fa-toggle-off'></i>
+                )}
+              </span>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Candles - Interval:</span>
+              <div className='coin-info-value'>
+                {symbolConfiguration.buy.athRestriction.candles.interval}
+              </div>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Candles - Limit:</span>
+              <div className='coin-info-value'>
+                {symbolConfiguration.buy.athRestriction.candles.limit}
+              </div>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Restriction Percentage:</span>
+              <div className='coin-info-value'>
+                {(
+                  (symbolConfiguration.buy.athRestriction
+                    .restrictionPercentage -
+                    1) *
+                  100
+                ).toFixed(2)}
+                %
+              </div>
+            </div>
+          </div>
+
+          <div className='coin-info-sub-wrapper'>
+            <div className='coin-info-sub-label'>Sell</div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Trading enabled:</span>
+              <span className='coin-info-value'>
+                {symbolConfiguration.sell.enabled ? (
+                  <i className='fas fa-toggle-on'></i>
+                ) : (
+                  <i className='fas fa-toggle-off'></i>
+                )}
+              </span>
+            </div>
+            {sellGridRows}
+          </div>
+
+          <div className='coin-info-sub-wrapper'>
+            <div className='coin-info-sub-label'>Sell - Stop Loss</div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Stop Loss Enabled:</span>
+              <span className='coin-info-value'>
+                {symbolConfiguration.sell.stopLoss.enabled ? (
+                  <i className='fas fa-toggle-on'></i>
+                ) : (
+                  <i className='fas fa-toggle-off'></i>
+                )}
+              </span>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Max Loss Percentage:</span>
+              <div className='coin-info-value'>
+                {(
+                  (symbolConfiguration.sell.stopLoss.maxLossPercentage - 1) *
+                  100
+                ).toFixed(2)}
+                %
+              </div>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Temporary disable buy:</span>
+              <div className='coin-info-value'>
+                {moment
+                  .duration(
+                    symbolConfiguration.sell.stopLoss.disableBuyMinutes,
+                    'minutes'
+                  )
+                  .humanize()}
+              </div>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Order Type:</span>
+              <div className='coin-info-value'>
+                {symbolConfiguration.sell.stopLoss.orderType}
+              </div>
+            </div>
+          </div>
+
+          <div className='coin-info-sub-wrapper'>
+            <div className='coin-info-sub-label'>
+              Bot Options - Auto Trigger Buy
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Enabled:</span>
+              <span className='coin-info-value'>
+                {symbolConfiguration.botOptions.autoTriggerBuy.enabled ? (
+                  <i className='fas fa-toggle-on'></i>
+                ) : (
+                  <i className='fas fa-toggle-off'></i>
+                )}
+              </span>
+            </div>
+            <div className='coin-info-column coin-info-column-order'>
+              <span className='coin-info-label'>Trigger after:</span>
+              <div className='coin-info-value'>
+                {moment
+                  .duration(
+                    symbolConfiguration.botOptions.autoTriggerBuy.triggerAfter,
+                    'minutes'
+                  )
+                  .humanize()}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
