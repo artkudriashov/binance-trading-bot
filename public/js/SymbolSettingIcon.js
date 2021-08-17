@@ -329,6 +329,10 @@ class SymbolSettingIcon extends React.Component {
                                     <i className='fas fa-question-circle fa-sm'></i>
                                   </Button>
                                 </OverlayTrigger>
+                                <SaleCalc
+                                    symbolInfo={symbolInfo}
+                                    buy={true}
+                                />
                               </Form.Check.Label>
                             </Form.Check>
                           </Form.Group>
@@ -666,6 +670,10 @@ class SymbolSettingIcon extends React.Component {
                                     <i className='fas fa-question-circle fa-sm'></i>
                                   </Button>
                                 </OverlayTrigger>
+                                <SaleCalc
+                                    symbolInfo={symbolInfo}
+                                    buy={false}
+                                />
                               </Form.Check.Label>
                             </Form.Check>
                           </Form.Group>
