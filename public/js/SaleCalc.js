@@ -104,7 +104,7 @@ class SaleCalc extends React.Component {
                             If <code>{simulation.simulateCurrentPrice ? "current price" : "buy trigger price"}</code> is <code>{simulation.simulateCurrentPrice || this.state.buyTriggerPrice}</code>, stop price will be{' '}
                             <code>{this.state.buyStopPrice = ((this.state.buyStopPrice > this.state.buyLimitPrice) ? (simulation.simulateCurrentPrice * symbolConfiguration.buy.gridTrade[0].stopPercentage).toFixed(4) : (simulation.simulateCurrentPrice ? this.state.buyStopPrice : (this.state.buyTriggerPrice * symbolConfiguration.buy.gridTrade[0].stopPercentage).toFixed(4)))}</code>.
                             If {simulation.simulateCurrentPrice ? "current price" : "buy stop price"} <code>{simulation.simulateCurrentPrice || this.state.buyStopPrice}</code>, limit price will be{' '}
-                            <code>{this.state.buyLimitPrice = ((simulation.simulateCurrentPrice || this.state.buyStopPrice) * symbolConfiguration.buy.gridTrade[0].limitPercentage).toFixed(4)}</code> for stop limit order.
+                            <code>{this.state.buyLimitPrice = ((simulation.simulateCurrentPrice || this.state.buyTriggerPrice) * symbolConfiguration.buy.gridTrade[0].limitPercentage).toFixed(4)}</code> for stop limit order.
                             You will buy <code>{this.state.coinsAmount = (symbolConfiguration.buy.gridTrade[0].maxPurchaseAmount / this.state.buyLimitPrice).toFixed(2)}</code> coins.
                         </Form.Text>
                     :
