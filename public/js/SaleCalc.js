@@ -95,8 +95,7 @@ class SaleCalc extends React.Component {
                             value={simulation.simulateCurrentPrice || this.state.buyTriggerPrice}
                             onChange={this.handleInputChange}
                         />
-                    { buy ?
-                        <Form.Text className='text-muted'>
+                        <Form.Text className='text-muted' style={{ display: buy ? "block" : "none" }}>
                             Buy:
                             if lowest price is <code>{symbolInfo.buy.lowestPrice}</code>,
                             then the bot will buy the coin when the current price reaches{' '}
@@ -107,8 +106,7 @@ class SaleCalc extends React.Component {
                             <code>{this.state.buyLimitPrice = ((simulation.simulateCurrentPrice || this.state.buyTriggerPrice) * symbolConfiguration.buy.gridTrade[0].limitPercentage).toFixed(4)}</code> for stop limit order.
                             You will buy <code>{this.state.coinsAmount = (symbolConfiguration.buy.gridTrade[0].maxPurchaseAmount / this.state.buyLimitPrice).toFixed(2)}</code> coins.
                         </Form.Text>
-                    :
-                        <Form.Text>
+                        <Form.Text className='text-muted' style={{ display: !buy ? "block" : "none" }}>
                             Sell:
                             minimum profit will be <code>{(symbolConfiguration.sell.gridTrade[0].triggerPercentage * 100 - 100).toFixed(2)}%</code>.
                             So if the <code>{simulation.simulateCurrentPrice ? "simulation last buy price" : "last buy price"}</code> is <code>{this.state.lastBuyPrice = (simulation.simulateCurrentPrice || symbolInfo.sell.lastBuyPrice || this.state.buyLimitPrice)}</code>, then the bot will start
@@ -118,7 +116,6 @@ class SaleCalc extends React.Component {
                             Limit price will be <code>{(symbolConfiguration.sell.gridTrade[0].limitPercentage * this.state.sellTriggerPrice).toFixed(4)}</code>.
                             Yor profit will be ~ <code>{(((symbolConfiguration.buy.gridTrade[0].maxPurchaseAmount / this.state.lastBuyPrice || this.state.coinsAmount ) * symbolConfiguration.sell.gridTrade[0].limitPercentage * this.state.sellTriggerPrice) - symbolConfiguration.buy.gridTrade[0].maxPurchaseAmount).toFixed(4)}</code> USDT.
                         </Form.Text>
-                    }
                     </Form.Group>
                 </div>
             </div>
