@@ -1,8 +1,6 @@
 /* eslint-disable no-lonely-if */
 /* eslint-disable global-require */
 
-const _ = require('lodash');
-
 describe('ensure-grid-trade-order-executed.js', () => {
   let result;
   let rawData;
@@ -10,18 +8,21 @@ describe('ensure-grid-trade-order-executed.js', () => {
   let binanceMock;
   let slackMock;
   let loggerMock;
-  let cacheMock;
   let PubSubMock;
 
   let mockCalculateLastBuyPrice;
   let mockGetAPILimit;
   let mockIsExceedAPILimit;
   let mockDisableAction;
-  let mockSaveOrder;
+  let mockSaveOrderStats;
 
   let mockSaveSymbolGridTrade;
 
-  const momentDateTime = '2020-01-02T00:00:00.000Z';
+  let mockGetGridTradeOrder;
+  let mockDeleteGridTradeOrder;
+  let mockSaveGridTradeOrder;
+
+  const momentDateTime = '2020-01-02T00:00:00+00:00';
 
   describe('execute', () => {
     beforeEach(async () => {
@@ -31,26 +32,15 @@ describe('ensure-grid-trade-order-executed.js', () => {
       jest.mock(
         'moment',
         () => nextCheck =>
-          jest.requireActual('moment')(nextCheck || '2020-01-02T00:00:00.000Z')
+          jest.requireActual('moment')(nextCheck || '2020-01-02T00:00:00+00:00')
       );
 
-      const {
-        binance,
-        slack,
-        cache,
-        logger,
-        PubSub
-      } = require('../../../../helpers');
+      const { binance, slack, logger, PubSub } = require('../../../../helpers');
 
       binanceMock = binance;
       slackMock = slack;
       loggerMock = logger;
-      cacheMock = cache;
       PubSubMock = PubSub;
-
-      cacheMock.get = jest.fn().mockResolvedValue(null);
-      cacheMock.set = jest.fn().mockResolvedValue(true);
-      cacheMock.del = jest.fn().mockResolvedValue(true);
 
       PubSubMock.publish = jest.fn().mockResolvedValue(true);
 
@@ -61,109 +51,13 @@ describe('ensure-grid-trade-order-executed.js', () => {
       mockGetAPILimit = jest.fn().mockResolvedValue(10);
       mockIsExceedAPILimit = jest.fn().mockReturnValue(false);
       mockDisableAction = jest.fn().mockResolvedValue(true);
-      mockSaveOrder = jest.fn().mockResolvedValue(true);
+      mockSaveOrderStats = jest.fn().mockResolvedValue(true);
 
       mockSaveSymbolGridTrade = jest.fn().mockResolvedValue(true);
-    });
 
-    describe('when action is already determined', () => {
-      beforeEach(async () => {
-        jest.mock('../../../trailingTradeHelper/common', () => ({
-          calculateLastBuyPrice: mockCalculateLastBuyPrice,
-          getAPILimit: mockGetAPILimit,
-          isExceedAPILimit: mockIsExceedAPILimit,
-          disableAction: mockDisableAction,
-          saveOrder: mockSaveOrder
-        }));
-
-        jest.mock('../../../trailingTradeHelper/configuration', () => ({
-          saveSymbolGridTrade: mockSaveSymbolGridTrade
-        }));
-
-        const step = require('../ensure-grid-trade-order-executed');
-
-        rawData = {
-          symbol: 'BTCUSDT',
-          action: 'buy',
-          featureToggle: { notifyOrderExecute: true, notifyDebug: true },
-          symbolConfiguration: {
-            buy: {
-              gridTrade: [
-                {
-                  triggerPercentage: 1,
-                  stopPercentage: 1.025,
-                  limitPercentage: 1.026,
-                  maxPurchaseAmount: 10,
-                  executed: false,
-                  executedOrder: null
-                },
-                {
-                  triggerPercentage: 0.8,
-                  stopPercentage: 1.025,
-                  limitPercentage: 1.026,
-                  maxPurchaseAmount: 10,
-                  executed: false,
-                  executedOrder: null
-                }
-              ]
-            },
-            sell: {
-              gridTrade: [
-                {
-                  triggerPercentage: 1.03,
-                  stopPercentage: 0.985,
-                  limitPercentage: 0.984,
-                  quantityPercentage: 0.8,
-                  executed: false,
-                  executedOrder: null
-                },
-                {
-                  triggerPercentage: 1.05,
-                  stopPercentage: 0.975,
-                  limitPercentage: 0.974,
-                  quantityPercentage: 1,
-                  executed: false,
-                  executedOrder: null
-                }
-              ]
-            },
-            system: {
-              checkOrderExecutePeriod: 10,
-              temporaryDisableActionAfterConfirmingOrder: 20
-            }
-          }
-        };
-
-        result = await step.execute(loggerMock, rawData);
-      });
-
-      it('does not trigger cache.get', () => {
-        expect(cacheMock.get).not.toHaveBeenCalled();
-      });
-
-      it('does not trigger cache.set', () => {
-        expect(cacheMock.set).not.toHaveBeenCalled();
-      });
-
-      it('does not trigger cache.del', () => {
-        expect(cacheMock.del).not.toHaveBeenCalled();
-      });
-
-      it('does not trigger binance.client.getOrder', () => {
-        expect(binanceMock.client.getOrder).not.toHaveBeenCalled();
-      });
-
-      it('does not trigger disableAction', () => {
-        expect(mockDisableAction).not.toHaveBeenCalled();
-      });
-
-      it('does not trigger saveOrder', () => {
-        expect(mockSaveOrder).not.toHaveBeenCalled();
-      });
-
-      it('returns epxected result', () => {
-        expect(result).toStrictEqual(rawData);
-      });
+      mockGetGridTradeOrder = jest.fn().mockResolvedValue(null);
+      mockDeleteGridTradeOrder = jest.fn().mockResolvedValue(true);
+      mockSaveGridTradeOrder = jest.fn().mockResolvedValue(true);
     });
 
     describe('when api limit is exceed', () => {
@@ -175,11 +69,17 @@ describe('ensure-grid-trade-order-executed.js', () => {
           getAPILimit: mockGetAPILimit,
           isExceedAPILimit: mockIsExceedAPILimit,
           disableAction: mockDisableAction,
-          saveOrder: mockSaveOrder
+          saveOrderStats: mockSaveOrderStats
         }));
 
         jest.mock('../../../trailingTradeHelper/configuration', () => ({
           saveSymbolGridTrade: mockSaveSymbolGridTrade
+        }));
+
+        jest.mock('../../../trailingTradeHelper/order', () => ({
+          getGridTradeOrder: mockGetGridTradeOrder,
+          deleteGridTradeOrder: mockDeleteGridTradeOrder,
+          saveGridTradeOrder: mockSaveGridTradeOrder
         }));
 
         const step = require('../ensure-grid-trade-order-executed');
@@ -189,6 +89,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
           action: 'not-determined',
           featureToggle: { notifyOrderExecute: true, notifyDebug: true },
           symbolConfiguration: {
+            symbols: ['BTCUSDT', 'BNBUSDT'],
             buy: {
               gridTrade: [
                 {
@@ -239,16 +140,16 @@ describe('ensure-grid-trade-order-executed.js', () => {
         result = await step.execute(loggerMock, rawData);
       });
 
-      it('does not trigger cache.get', () => {
-        expect(cacheMock.get).not.toHaveBeenCalled();
+      it('does not trigger getGridTradeOrder', () => {
+        expect(mockGetGridTradeOrder).not.toHaveBeenCalled();
       });
 
-      it('does not trigger cache.set', () => {
-        expect(cacheMock.set).not.toHaveBeenCalled();
+      it('does not trigger saveGridTradeOrder', () => {
+        expect(mockSaveGridTradeOrder).not.toHaveBeenCalled();
       });
 
-      it('does not trigger cache.del', () => {
-        expect(cacheMock.del).not.toHaveBeenCalled();
+      it('does not trigger deleteGridTradeOrder', () => {
+        expect(mockDeleteGridTradeOrder).not.toHaveBeenCalled();
       });
 
       it('does not trigger binance.client.getOrder', () => {
@@ -259,8 +160,8 @@ describe('ensure-grid-trade-order-executed.js', () => {
         expect(mockDisableAction).not.toHaveBeenCalled();
       });
 
-      it('does not trigger saveOrder', () => {
-        expect(mockSaveOrder).not.toHaveBeenCalled();
+      it('does not trigger saveOrderStats', () => {
+        expect(mockSaveOrderStats).not.toHaveBeenCalled();
       });
 
       it('returns epxected result', () => {
@@ -291,7 +192,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 0,
-            nextCheck: '2020-01-01T23:59:00.000Z'
+            nextCheck: '2020-01-01T23:59:00+00:00'
           },
           getOrder: null,
           saveSymbolGridTrade: {
@@ -300,7 +201,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 executed: true,
                 executedOrder: {
                   currentGridTradeIndex: 0,
-                  nextCheck: '2020-01-01T23:59:00.000Z',
+                  nextCheck: '2020-01-01T23:59:00+00:00',
                   orderId: 2705449295,
                   origQty: '0.03320000',
                   price: '302.09000000',
@@ -358,7 +259,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 1,
-            nextCheck: '2020-01-01T23:59:00.000Z'
+            nextCheck: '2020-01-01T23:59:00+00:00'
           },
           getOrder: null,
           saveSymbolGridTrade: {
@@ -375,7 +276,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 executed: true,
                 executedOrder: {
                   currentGridTradeIndex: 1,
-                  nextCheck: '2020-01-01T23:59:00.000Z',
+                  nextCheck: '2020-01-01T23:59:00+00:00',
                   orderId: 2705449295,
                   origQty: '0.03320000',
                   price: '302.09000000',
@@ -424,7 +325,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 0,
-            nextCheck: '2020-01-02T00:01:00.000Z'
+            nextCheck: '2020-01-02T00:01:00+00:00'
           },
           getOrder: null,
           saveSymbolGridTrade: null
@@ -442,7 +343,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 0,
-            nextCheck: '2020-01-01T23:59:00.000Z'
+            nextCheck: '2020-01-01T23:59:00+00:00'
           },
           getOrder: {
             symbol: 'BNBUSDT',
@@ -470,7 +371,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
               origQty: '0.03320000',
               stopPrice: '301.80000000',
               currentGridTradeIndex: 0,
-              nextCheck: '2020-01-01T23:59:00.000Z'
+              nextCheck: '2020-01-01T23:59:00+00:00'
             },
             getOrder: {
               symbol: 'BNBUSDT',
@@ -499,7 +400,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 0,
-            nextCheck: '2020-01-01T23:59:00.000Z'
+            nextCheck: '2020-01-01T23:59:00+00:00'
           },
           getOrder: {
             symbol: 'BNBUSDT',
@@ -517,7 +418,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 executed: true,
                 executedOrder: {
                   currentGridTradeIndex: 0,
-                  nextCheck: '2020-01-01T23:59:00.000Z',
+                  nextCheck: '2020-01-01T23:59:00+00:00',
                   orderId: 2705449295,
                   origQty: '0.03320000',
                   price: '302.09000000',
@@ -575,7 +476,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 1,
-            nextCheck: '2020-01-01T23:59:00.000Z'
+            nextCheck: '2020-01-01T23:59:00+00:00'
           },
           getOrder: {
             symbol: 'BNBUSDT',
@@ -601,7 +502,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 executed: true,
                 executedOrder: {
                   currentGridTradeIndex: 1,
-                  nextCheck: '2020-01-01T23:59:00.000Z',
+                  nextCheck: '2020-01-01T23:59:00+00:00',
                   orderId: 2705449295,
                   origQty: '0.03320000',
                   price: '302.09000000',
@@ -650,7 +551,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 0,
-            nextCheck: '2020-01-01T23:59:00.000Z'
+            nextCheck: '2020-01-01T23:59:00+00:00'
           },
           getOrder: 'error',
           saveSymbolGridTrade: null
@@ -658,14 +559,6 @@ describe('ensure-grid-trade-order-executed.js', () => {
       ].forEach((t, index) => {
         describe(`${t.desc}`, () => {
           beforeEach(async () => {
-            cacheMock.get = jest.fn().mockImplementation(key => {
-              if (key === `${t.symbol}-grid-trade-last-buy-order`) {
-                return JSON.stringify(t.lastBuyOrder);
-              }
-
-              return null;
-            });
-
             if (t.getOrder === 'error') {
               binanceMock.client.getOrder = jest
                 .fn()
@@ -681,11 +574,27 @@ describe('ensure-grid-trade-order-executed.js', () => {
               getAPILimit: mockGetAPILimit,
               isExceedAPILimit: mockIsExceedAPILimit,
               disableAction: mockDisableAction,
-              saveOrder: mockSaveOrder
+              saveOrderStats: mockSaveOrderStats
             }));
 
             jest.mock('../../../trailingTradeHelper/configuration', () => ({
               saveSymbolGridTrade: mockSaveSymbolGridTrade
+            }));
+
+            mockGetGridTradeOrder = jest
+              .fn()
+              .mockImplementation((_logger, key) => {
+                if (key === `${t.symbol}-grid-trade-last-buy-order`) {
+                  return t.lastBuyOrder;
+                }
+
+                return null;
+              });
+
+            jest.mock('../../../trailingTradeHelper/order', () => ({
+              getGridTradeOrder: mockGetGridTradeOrder,
+              deleteGridTradeOrder: mockDeleteGridTradeOrder,
+              saveGridTradeOrder: mockSaveGridTradeOrder
             }));
 
             const step = require('../ensure-grid-trade-order-executed');
@@ -698,6 +607,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 notifyDebug: t.notifyDebug || false
               },
               symbolConfiguration: {
+                symbols: ['BTCUSDT', 'BNBUSDT'],
                 buy: {
                   gridTrade: [
                     {
@@ -748,8 +658,9 @@ describe('ensure-grid-trade-order-executed.js', () => {
             result = await step.execute(loggerMock, rawData);
           });
 
-          it('triggers cache.get for getting cached order', () => {
-            expect(cacheMock.get).toHaveBeenCalledWith(
+          it('triggers getGridTradeOrder for getting cached order', () => {
+            expect(mockGetGridTradeOrder).toHaveBeenCalledWith(
+              loggerMock,
               `${t.symbol}-grid-trade-last-buy-order`
             );
           });
@@ -760,12 +671,12 @@ describe('ensure-grid-trade-order-executed.js', () => {
               expect(binanceMock.client.getOrder).not.toHaveBeenCalled();
             });
 
-            it('does not trigger cache.set as order not found', () => {
-              expect(cacheMock.set).not.toHaveBeenCalled();
+            it('does not trigger saveGridTradeOrder as order not found', () => {
+              expect(mockSaveGridTradeOrder).not.toHaveBeenCalled();
             });
 
-            it('does not trigger cache.del as order not found', () => {
-              expect(cacheMock.del).not.toHaveBeenCalled();
+            it('does not trigger deleteGridTradeOrder as order not found', () => {
+              expect(mockDeleteGridTradeOrder).not.toHaveBeenCalled();
             });
 
             it('does not trigger saveSymbolGridTrade', () => {
@@ -776,8 +687,8 @@ describe('ensure-grid-trade-order-executed.js', () => {
               expect(mockDisableAction).not.toHaveBeenCalled();
             });
 
-            it('does not trigger saveOrder', () => {
-              expect(mockSaveOrder).not.toHaveBeenCalled();
+            it('does not trigger saveOrderStats', () => {
+              expect(mockSaveOrderStats).not.toHaveBeenCalled();
             });
           } else if (t.lastBuyOrder.status.includes('FILLED')) {
             // do filled thing
@@ -797,14 +708,16 @@ describe('ensure-grid-trade-order-executed.js', () => {
               );
             });
 
-            it('triggers cache.del as order filled', () => {
-              expect(cacheMock.del).toHaveBeenCalledWith(
+            it('triggers deleteGridTradeOrder as order filled', () => {
+              expect(mockDeleteGridTradeOrder).toHaveBeenCalledWith(
+                loggerMock,
                 `${t.symbol}-grid-trade-last-buy-order`
               );
             });
 
             it('triggers disableAction as order filled', () => {
               expect(mockDisableAction).toHaveBeenCalledWith(
+                loggerMock,
                 t.symbol,
                 {
                   disabledBy: 'buy filled order',
@@ -817,32 +730,24 @@ describe('ensure-grid-trade-order-executed.js', () => {
               );
             });
 
-            it('triggers saveOrder as order filled', () => {
-              const { lastBuyOrder } = t;
-
-              const order = _.cloneDeep(lastBuyOrder);
-
-              expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-                order,
-                botStatus: {
-                  savedAt: expect.any(String),
-                  savedBy: 'ensure-grid-trade-order-executed',
-                  savedMessage:
-                    'The order has already filled and updated the last buy price.'
-                }
-              });
+            it('triggers saveOrderStats', () => {
+              expect(mockSaveOrderStats).toHaveBeenCalledWith(loggerMock, [
+                'BTCUSDT',
+                'BNBUSDT'
+              ]);
             });
           } else {
             if (t.getOrder === 'error') {
               // order throws an error
-              it('triggers cache.set for last buy order as order throws error', () => {
-                expect(cacheMock.set).toHaveBeenCalledWith(
+              it('triggers saveGridTradeOrder for last buy order as order throws error', () => {
+                expect(mockSaveGridTradeOrder).toHaveBeenCalledWith(
+                  loggerMock,
                   `${t.symbol}-grid-trade-last-buy-order`,
-                  JSON.stringify({
+                  {
                     ...t.lastBuyOrder,
                     // 10 secs
-                    nextCheck: '2020-01-02T00:00:10.000Z'
-                  })
+                    nextCheck: '2020-01-02T00:00:10+00:00'
+                  }
                 );
               });
 
@@ -850,28 +755,16 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
               });
 
-              it('does not trigger cache.del for last buy order as order throws error', () => {
-                expect(cacheMock.del).not.toHaveBeenCalled();
+              it('does not trigger deleteGridTradeOrder for last buy order as order throws error', () => {
+                expect(mockDeleteGridTradeOrder).not.toHaveBeenCalled();
               });
 
               it('does not trigger disableAction as order throws error', () => {
                 expect(mockDisableAction).not.toHaveBeenCalled();
               });
 
-              it('triggers saveOrder as order throws error', () => {
-                const { lastBuyOrder } = t;
-
-                const order = _.cloneDeep(lastBuyOrder);
-
-                expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-                  order,
-                  botStatus: {
-                    savedAt: expect.any(String),
-                    savedBy: 'ensure-grid-trade-order-executed',
-                    savedMessage:
-                      'The order could not be found or error occurred querying the order.'
-                  }
-                });
+              it('does not trigger saveOrderStats as order throws error', () => {
+                expect(mockSaveOrderStats).not.toHaveBeenCalled();
               });
             } else if (
               Date.parse(t.lastBuyOrder.nextCheck) < Date.parse(momentDateTime)
@@ -902,14 +795,16 @@ describe('ensure-grid-trade-order-executed.js', () => {
                   );
                 });
 
-                it('triggers cache.del as order filled after getting order result', () => {
-                  expect(cacheMock.del).toHaveBeenCalledWith(
+                it('triggers deleteGridTradeOrder as order filled after getting order result', () => {
+                  expect(mockDeleteGridTradeOrder).toHaveBeenCalledWith(
+                    loggerMock,
                     `${t.symbol}-grid-trade-last-buy-order`
                   );
                 });
 
                 it('triggers disableAction after getting order result', () => {
                   expect(mockDisableAction).toHaveBeenCalledWith(
+                    loggerMock,
                     t.symbol,
                     {
                       disabledBy: 'buy filled order',
@@ -922,19 +817,11 @@ describe('ensure-grid-trade-order-executed.js', () => {
                   );
                 });
 
-                it('triggers saveOrder as order filled after getting order result', () => {
-                  expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-                    order: {
-                      ...t.lastBuyOrder,
-                      ...t.getOrder
-                    },
-                    botStatus: {
-                      savedAt: expect.any(String),
-                      savedBy: 'ensure-grid-trade-order-executed',
-                      savedMessage:
-                        'The order has filled and updated the last buy price.'
-                    }
-                  });
+                it('triggers saveOrderStats after getting order result', () => {
+                  expect(mockSaveOrderStats).toHaveBeenCalledWith(loggerMock, [
+                    'BTCUSDT',
+                    'BNBUSDT'
+                  ]);
                 });
               } else if (
                 ['CANCELED', 'REJECTED', 'EXPIRED', 'PENDING_CANCEL'].includes(
@@ -942,8 +829,9 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 ) === true
               ) {
                 // do cancel thing
-                it('triggers cache.del due to cancelled order', () => {
-                  expect(cacheMock.del).toHaveBeenCalledWith(
+                it('triggers deleteGridTradeOrder due to cancelled order', () => {
+                  expect(mockDeleteGridTradeOrder).toHaveBeenCalledWith(
+                    loggerMock,
                     `${t.symbol}-grid-trade-last-buy-order`
                   );
                 });
@@ -956,37 +844,30 @@ describe('ensure-grid-trade-order-executed.js', () => {
                   expect(mockDisableAction).not.toHaveBeenCalled();
                 });
 
-                it('triggers saveOrder due to cancelled order', () => {
-                  expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-                    order: {
-                      ...t.lastBuyOrder,
-                      ...t.getOrder
-                    },
-                    botStatus: {
-                      savedAt: expect.any(String),
-                      savedBy: 'ensure-grid-trade-order-executed',
-                      savedMessage:
-                        'The order is no longer valid. Removed from the cache.'
-                    }
-                  });
+                it('triggers saveOrderStats due to cancelled order', () => {
+                  expect(mockSaveOrderStats).toHaveBeenCalledWith(loggerMock, [
+                    'BTCUSDT',
+                    'BNBUSDT'
+                  ]);
                 });
               } else {
                 // do else thing
-                it('triggers cache.set for last buy order as not filled', () => {
-                  expect(cacheMock.set).toHaveBeenCalledWith(
+                it('triggers saveGridTradeOrder for last buy order as not filled', () => {
+                  expect(mockSaveGridTradeOrder).toHaveBeenCalledWith(
+                    loggerMock,
                     `${t.symbol}-grid-trade-last-buy-order`,
-                    JSON.stringify({
+                    {
                       ...t.getOrder,
                       currentGridTradeIndex:
                         t.lastBuyOrder.currentGridTradeIndex,
                       // 10 secs
-                      nextCheck: '2020-01-02T00:00:10.000Z'
-                    })
+                      nextCheck: '2020-01-02T00:00:10+00:00'
+                    }
                   );
                 });
 
-                it('does not trigger cache.del for last buy order as not filled', () => {
-                  expect(cacheMock.del).not.toHaveBeenCalled();
+                it('does not trigger deleteGridTradeOrder for last buy order as not filled', () => {
+                  expect(mockDeleteGridTradeOrder).not.toHaveBeenCalled();
                 });
 
                 it('does not trigger saveSymbolGridTrade as not filled', () => {
@@ -997,22 +878,8 @@ describe('ensure-grid-trade-order-executed.js', () => {
                   expect(mockDisableAction).not.toHaveBeenCalled();
                 });
 
-                it('triggers saveOrder as not filled', () => {
-                  const { lastBuyOrder } = t;
-
-                  const order = _.cloneDeep(lastBuyOrder);
-                  _.unset(order, ['nextCheck']);
-                  _.unset(order, ['currentGridTradeIndex']);
-
-                  expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-                    order,
-                    botStatus: {
-                      savedAt: expect.any(String),
-                      savedBy: 'ensure-grid-trade-order-executed',
-                      savedMessage:
-                        'The order is not filled. Check next internal.'
-                    }
-                  });
+                it('does not trigger saveOrderStats as not filled', () => {
+                  expect(mockSaveOrderStats).not.toHaveBeenCalled();
                 });
               }
             } else if (
@@ -1023,12 +890,12 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 expect(binanceMock.client.getOrder).not.toHaveBeenCalled();
               });
 
-              it('does not trigger cache.set because time is not yet to check', () => {
-                expect(cacheMock.set).not.toHaveBeenCalled();
+              it('does not trigger saveGridTradeOrder because time is not yet to check', () => {
+                expect(mockSaveGridTradeOrder).not.toHaveBeenCalled();
               });
 
-              it('does not trigger cache.del because time is not yet to check', () => {
-                expect(cacheMock.del).not.toHaveBeenCalled();
+              it('does not trigger deleteGridTradeOrder because time is not yet to check', () => {
+                expect(mockDeleteGridTradeOrder).not.toHaveBeenCalled();
               });
 
               it('does not trigger saveSymbolGridTrade because time is not yet to check', () => {
@@ -1039,8 +906,8 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 expect(mockDisableAction).not.toHaveBeenCalled();
               });
 
-              it('does not trigger saveOrder because time is not yet to check', () => {
-                expect(mockSaveOrder).not.toHaveBeenCalled();
+              it('does not trigger saveOrderStats because time is not yet to check', () => {
+                expect(mockSaveOrderStats).not.toHaveBeenCalled();
               });
             }
           }
@@ -1075,7 +942,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 0,
-            nextCheck: '2020-01-01T23:59:00.000Z'
+            nextCheck: '2020-01-01T23:59:00+00:00'
           },
           getOrder: null,
           saveSymbolGridTrade: {
@@ -1102,7 +969,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 executed: true,
                 executedOrder: {
                   currentGridTradeIndex: 0,
-                  nextCheck: '2020-01-01T23:59:00.000Z',
+                  nextCheck: '2020-01-01T23:59:00+00:00',
                   orderId: 2705449295,
                   origQty: '0.03320000',
                   price: '302.09000000',
@@ -1142,7 +1009,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 1,
-            nextCheck: '2020-01-01T23:59:00.000Z'
+            nextCheck: '2020-01-01T23:59:00+00:00'
           },
           getOrder: null,
           saveSymbolGridTrade: {
@@ -1177,7 +1044,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 executed: true,
                 executedOrder: {
                   currentGridTradeIndex: 1,
-                  nextCheck: '2020-01-01T23:59:00.000Z',
+                  nextCheck: '2020-01-01T23:59:00+00:00',
                   orderId: 2705449295,
                   origQty: '0.03320000',
                   price: '302.09000000',
@@ -1208,7 +1075,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 0,
-            nextCheck: '2020-01-02T00:01:00.000Z'
+            nextCheck: '2020-01-02T00:01:00+00:00'
           },
           getOrder: null,
           saveSymbolGridTrade: null
@@ -1226,7 +1093,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 0,
-            nextCheck: '2020-01-01T23:59:00.000Z'
+            nextCheck: '2020-01-01T23:59:00+00:00'
           },
           getOrder: {
             symbol: 'BNBUSDT',
@@ -1254,7 +1121,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
               origQty: '0.03320000',
               stopPrice: '301.80000000',
               currentGridTradeIndex: 0,
-              nextCheck: '2020-01-01T23:59:00.000Z'
+              nextCheck: '2020-01-01T23:59:00+00:00'
             },
             getOrder: {
               symbol: 'BNBUSDT',
@@ -1283,7 +1150,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 0,
-            nextCheck: '2020-01-01T23:59:00.000Z'
+            nextCheck: '2020-01-01T23:59:00+00:00'
           },
           getOrder: {
             symbol: 'BNBUSDT',
@@ -1319,7 +1186,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 executed: true,
                 executedOrder: {
                   currentGridTradeIndex: 0,
-                  nextCheck: '2020-01-01T23:59:00.000Z',
+                  nextCheck: '2020-01-01T23:59:00+00:00',
                   orderId: 2705449295,
                   origQty: '0.03320000',
                   price: '302.09000000',
@@ -1359,7 +1226,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 1,
-            nextCheck: '2020-01-01T23:59:00.000Z'
+            nextCheck: '2020-01-01T23:59:00+00:00'
           },
           getOrder: {
             symbol: 'BNBUSDT',
@@ -1403,7 +1270,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 executed: true,
                 executedOrder: {
                   currentGridTradeIndex: 1,
-                  nextCheck: '2020-01-01T23:59:00.000Z',
+                  nextCheck: '2020-01-01T23:59:00+00:00',
                   orderId: 2705449295,
                   origQty: '0.03320000',
                   price: '302.09000000',
@@ -1434,7 +1301,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
             origQty: '0.03320000',
             stopPrice: '301.80000000',
             currentGridTradeIndex: 0,
-            nextCheck: '2020-01-01T23:59:00.000Z'
+            nextCheck: '2020-01-01T23:59:00+00:00'
           },
           getOrder: 'error',
           saveSymbolGridTrade: {}
@@ -1442,14 +1309,6 @@ describe('ensure-grid-trade-order-executed.js', () => {
       ].forEach((t, index) => {
         describe(`${t.desc}`, () => {
           beforeEach(async () => {
-            cacheMock.get = jest.fn().mockImplementation(key => {
-              if (key === `${t.symbol}-grid-trade-last-sell-order`) {
-                return JSON.stringify(t.lastSellOrder);
-              }
-
-              return null;
-            });
-
             if (t.getOrder === 'error') {
               binanceMock.client.getOrder = jest
                 .fn()
@@ -1464,11 +1323,27 @@ describe('ensure-grid-trade-order-executed.js', () => {
               getAPILimit: mockGetAPILimit,
               isExceedAPILimit: mockIsExceedAPILimit,
               disableAction: mockDisableAction,
-              saveOrder: mockSaveOrder
+              saveOrderStats: mockSaveOrderStats
             }));
 
             jest.mock('../../../trailingTradeHelper/configuration', () => ({
               saveSymbolGridTrade: mockSaveSymbolGridTrade
+            }));
+
+            mockGetGridTradeOrder = jest
+              .fn()
+              .mockImplementation((_logger, key) => {
+                if (key === `${t.symbol}-grid-trade-last-sell-order`) {
+                  return t.lastSellOrder;
+                }
+
+                return null;
+              });
+
+            jest.mock('../../../trailingTradeHelper/order', () => ({
+              getGridTradeOrder: mockGetGridTradeOrder,
+              deleteGridTradeOrder: mockDeleteGridTradeOrder,
+              saveGridTradeOrder: mockSaveGridTradeOrder
             }));
 
             const step = require('../ensure-grid-trade-order-executed');
@@ -1481,6 +1356,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 notifyDebug: index % 2
               },
               symbolConfiguration: {
+                symbols: ['BTCUSDT', 'BNBUSDT'],
                 buy: {
                   gridTrade: [
                     {
@@ -1531,8 +1407,9 @@ describe('ensure-grid-trade-order-executed.js', () => {
             result = await step.execute(loggerMock, rawData);
           });
 
-          it('triggers cache.get for getting cached order', () => {
-            expect(cacheMock.get).toHaveBeenCalledWith(
+          it('triggers getGridTradeOrder for getting cached order', () => {
+            expect(mockGetGridTradeOrder).toHaveBeenCalledWith(
+              loggerMock,
               `${t.symbol}-grid-trade-last-sell-order`
             );
           });
@@ -1543,20 +1420,20 @@ describe('ensure-grid-trade-order-executed.js', () => {
               expect(binanceMock.client.getOrder).not.toHaveBeenCalled();
             });
 
-            it('does not trigger cache.set as order not found', () => {
-              expect(cacheMock.set).not.toHaveBeenCalled();
+            it('does not trigger saveGridTradeOrder as order not found', () => {
+              expect(mockSaveGridTradeOrder).not.toHaveBeenCalled();
             });
 
-            it('does not trigger cache.del as order not found', () => {
-              expect(cacheMock.del).not.toHaveBeenCalled();
+            it('does not trigger deleteGridTradeOrder as order not found', () => {
+              expect(mockDeleteGridTradeOrder).not.toHaveBeenCalled();
             });
 
             it('does not trigger disableAction', () => {
               expect(mockDisableAction).not.toHaveBeenCalled();
             });
 
-            it('does not trigger saveOrder', () => {
-              expect(mockSaveOrder).not.toHaveBeenCalled();
+            it('does not trigger saveOrderStats', () => {
+              expect(mockSaveOrderStats).not.toHaveBeenCalled();
             });
           } else if (t.lastSellOrder.status.includes('FILLED')) {
             // do filled thing
@@ -1569,14 +1446,16 @@ describe('ensure-grid-trade-order-executed.js', () => {
               );
             });
 
-            it('triggers cache.del as order filled', () => {
-              expect(cacheMock.del).toHaveBeenCalledWith(
+            it('triggers deleteGridTradeOrder as order filled', () => {
+              expect(mockDeleteGridTradeOrder).toHaveBeenCalledWith(
+                loggerMock,
                 `${t.symbol}-grid-trade-last-sell-order`
               );
             });
 
             it('triggers disableAction as order filled', () => {
               expect(mockDisableAction).toHaveBeenCalledWith(
+                loggerMock,
                 t.symbol,
                 {
                   disabledBy: 'sell filled order',
@@ -1589,32 +1468,24 @@ describe('ensure-grid-trade-order-executed.js', () => {
               );
             });
 
-            it('triggers saveOrder as order filled', () => {
-              const { lastSellOrder } = t;
-
-              const order = _.cloneDeep(lastSellOrder);
-
-              expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-                order,
-                botStatus: {
-                  savedAt: expect.any(String),
-                  savedBy: 'ensure-grid-trade-order-executed',
-                  savedMessage:
-                    'The order has already filled and updated the last buy price.'
-                }
-              });
+            it('triggers saveOrderStats', () => {
+              expect(mockSaveOrderStats).toHaveBeenCalledWith(loggerMock, [
+                'BTCUSDT',
+                'BNBUSDT'
+              ]);
             });
           } else {
             if (t.getOrder === 'error') {
               // order throws an error
-              it('triggers cache.set for last sell order as order throws error', () => {
-                expect(cacheMock.set).toHaveBeenCalledWith(
+              it('triggers saveGridTradeOrder for last sell order as order throws error', () => {
+                expect(mockSaveGridTradeOrder).toHaveBeenCalledWith(
+                  loggerMock,
                   `${t.symbol}-grid-trade-last-sell-order`,
-                  JSON.stringify({
+                  {
                     ...t.lastSellOrder,
                     // 10 secs
-                    nextCheck: '2020-01-02T00:00:10.000Z'
-                  })
+                    nextCheck: '2020-01-02T00:00:10+00:00'
+                  }
                 );
               });
 
@@ -1622,28 +1493,16 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
               });
 
-              it('does not trigger cache.del for last sell order as order throws error', () => {
-                expect(cacheMock.del).not.toHaveBeenCalled();
+              it('does not trigger deleteGridTradeOrder for last sell order as order throws error', () => {
+                expect(mockDeleteGridTradeOrder).not.toHaveBeenCalled();
               });
 
               it('does not trigger disableAction as order throws error', () => {
                 expect(mockDisableAction).not.toHaveBeenCalled();
               });
 
-              it('triggers saveOrder as order throws error', () => {
-                const { lastSellOrder } = t;
-
-                const order = _.cloneDeep(lastSellOrder);
-
-                expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-                  order,
-                  botStatus: {
-                    savedAt: expect.any(String),
-                    savedBy: 'ensure-grid-trade-order-executed',
-                    savedMessage:
-                      'The order could not be found or error occurred querying the order.'
-                  }
-                });
+              it('does not trigger saveOrderStats as order throws error', () => {
+                expect(mockSaveOrderStats).not.toHaveBeenCalled();
               });
             } else if (
               Date.parse(t.lastSellOrder.nextCheck) < Date.parse(momentDateTime)
@@ -1666,14 +1525,16 @@ describe('ensure-grid-trade-order-executed.js', () => {
                   );
                 });
 
-                it('triggers cache.del as order filled after getting order result', () => {
-                  expect(cacheMock.del).toHaveBeenCalledWith(
+                it('triggers deleteGridTradeOrder as order filled after getting order result', () => {
+                  expect(mockDeleteGridTradeOrder).toHaveBeenCalledWith(
+                    loggerMock,
                     `${t.symbol}-grid-trade-last-sell-order`
                   );
                 });
 
                 it('triggers disableAction after getting order result', () => {
                   expect(mockDisableAction).toHaveBeenCalledWith(
+                    loggerMock,
                     t.symbol,
                     {
                       disabledBy: 'sell filled order',
@@ -1686,19 +1547,11 @@ describe('ensure-grid-trade-order-executed.js', () => {
                   );
                 });
 
-                it('triggers saveOrder as order filled after getting order result', () => {
-                  expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-                    order: {
-                      ...t.lastSellOrder,
-                      ...t.getOrder
-                    },
-                    botStatus: {
-                      savedAt: expect.any(String),
-                      savedBy: 'ensure-grid-trade-order-executed',
-                      savedMessage:
-                        'The order has filled and updated the last buy price.'
-                    }
-                  });
+                it('triggers saveOrderStats after getting order result', () => {
+                  expect(mockSaveOrderStats).toHaveBeenCalledWith(loggerMock, [
+                    'BTCUSDT',
+                    'BNBUSDT'
+                  ]);
                 });
               } else if (
                 ['CANCELED', 'REJECTED', 'EXPIRED', 'PENDING_CANCEL'].includes(
@@ -1706,8 +1559,9 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 ) === true
               ) {
                 // do cancel thing
-                it('triggers cache.del due to cancelled order', () => {
-                  expect(cacheMock.del).toHaveBeenCalledWith(
+                it('triggers deleteGridTradeOrder due to cancelled order', () => {
+                  expect(mockDeleteGridTradeOrder).toHaveBeenCalledWith(
+                    loggerMock,
                     `${t.symbol}-grid-trade-last-sell-order`
                   );
                 });
@@ -1720,37 +1574,30 @@ describe('ensure-grid-trade-order-executed.js', () => {
                   expect(mockDisableAction).not.toHaveBeenCalled();
                 });
 
-                it('triggers saveOrder due to cancelled order', () => {
-                  expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-                    order: {
-                      ...t.lastSellOrder,
-                      ...t.getOrder
-                    },
-                    botStatus: {
-                      savedAt: expect.any(String),
-                      savedBy: 'ensure-grid-trade-order-executed',
-                      savedMessage:
-                        'The order is no longer valid. Removed from the cache.'
-                    }
-                  });
+                it('triggers saveOrderStats due to cancelled order', () => {
+                  expect(mockSaveOrderStats).toHaveBeenCalledWith(loggerMock, [
+                    'BTCUSDT',
+                    'BNBUSDT'
+                  ]);
                 });
               } else {
                 // do else thing
-                it('triggers cache.set for last sell order as not filled', () => {
-                  expect(cacheMock.set).toHaveBeenCalledWith(
+                it('triggers saveGridTradeOrder for last sell order as not filled', () => {
+                  expect(mockSaveGridTradeOrder).toHaveBeenCalledWith(
+                    loggerMock,
                     `${t.symbol}-grid-trade-last-sell-order`,
-                    JSON.stringify({
+                    {
                       ...t.getOrder,
                       currentGridTradeIndex:
                         t.lastSellOrder.currentGridTradeIndex,
                       // 10 secs
-                      nextCheck: '2020-01-02T00:00:10.000Z'
-                    })
+                      nextCheck: '2020-01-02T00:00:10+00:00'
+                    }
                   );
                 });
 
-                it('does not trigger cache.del for last sell order as not filled', () => {
-                  expect(cacheMock.del).not.toHaveBeenCalled();
+                it('does not trigger deleteGridTradeOrder for last sell order as not filled', () => {
+                  expect(mockDeleteGridTradeOrder).not.toHaveBeenCalled();
                 });
 
                 it('does not trigger saveSymbolGridTrade as not filled', () => {
@@ -1761,22 +1608,8 @@ describe('ensure-grid-trade-order-executed.js', () => {
                   expect(mockDisableAction).not.toHaveBeenCalled();
                 });
 
-                it('triggers saveOrder as not filled', () => {
-                  const { lastSellOrder } = t;
-
-                  const order = _.cloneDeep(lastSellOrder);
-                  _.unset(order, ['nextCheck']);
-                  _.unset(order, ['currentGridTradeIndex']);
-
-                  expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-                    order,
-                    botStatus: {
-                      savedAt: expect.any(String),
-                      savedBy: 'ensure-grid-trade-order-executed',
-                      savedMessage:
-                        'The order is not filled. Check next internal.'
-                    }
-                  });
+                it('does not trigger saveOrderStats as not filled', () => {
+                  expect(mockSaveOrderStats).not.toHaveBeenCalled();
                 });
               }
             } else if (
@@ -1787,12 +1620,12 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 expect(binanceMock.client.getOrder).not.toHaveBeenCalled();
               });
 
-              it('does not trigger cache.set because time is not yet to check', () => {
-                expect(cacheMock.set).not.toHaveBeenCalled();
+              it('does not trigger saveGridTradeOrder because time is not yet to check', () => {
+                expect(mockSaveGridTradeOrder).not.toHaveBeenCalled();
               });
 
-              it('does not trigger cache.del because time is not yet to check', () => {
-                expect(cacheMock.del).not.toHaveBeenCalled();
+              it('does not trigger deleteGridTradeOrder because time is not yet to check', () => {
+                expect(mockDeleteGridTradeOrder).not.toHaveBeenCalled();
               });
 
               it('does not trigger saveSymbolGridTrade because time is not yet to check', () => {
@@ -1803,8 +1636,8 @@ describe('ensure-grid-trade-order-executed.js', () => {
                 expect(mockDisableAction).not.toHaveBeenCalled();
               });
 
-              it('does not trigger saveOrder because time is not yet to check', () => {
-                expect(mockSaveOrder).not.toHaveBeenCalled();
+              it('does not trigger saveOrderStats because time is not yet to check', () => {
+                expect(mockSaveOrderStats).not.toHaveBeenCalled();
               });
             }
           }
@@ -1819,19 +1652,6 @@ describe('ensure-grid-trade-order-executed.js', () => {
     describe('slackMessageOrderFilled', () => {
       describe('when orderParams does not have type for some reason', () => {
         beforeEach(async () => {
-          cacheMock.get = jest.fn().mockImplementation(key => {
-            if (key === `BTCUSDT-grid-trade-last-buy-order`) {
-              return JSON.stringify({
-                symbol: 'BTCUSDT',
-                side: 'BUY',
-                status: 'NEW',
-                currentGridTradeIndex: 0,
-                nextCheck: '2020-01-01T23:59:00.000Z'
-              });
-            }
-            return null;
-          });
-
           binanceMock.client.getOrder = jest.fn().mockResolvedValue({
             symbol: 'BNBUSDT',
             side: 'BUY',
@@ -1844,11 +1664,32 @@ describe('ensure-grid-trade-order-executed.js', () => {
             getAPILimit: mockGetAPILimit,
             isExceedAPILimit: mockIsExceedAPILimit,
             disableAction: mockDisableAction,
-            saveOrder: mockSaveOrder
+            saveOrderStats: mockSaveOrderStats
           }));
 
           jest.mock('../../../trailingTradeHelper/configuration', () => ({
             saveSymbolGridTrade: mockSaveSymbolGridTrade
+          }));
+
+          mockGetGridTradeOrder = jest
+            .fn()
+            .mockImplementation((_logger, key) => {
+              if (key === `BTCUSDT-grid-trade-last-buy-order`) {
+                return {
+                  symbol: 'BTCUSDT',
+                  side: 'BUY',
+                  status: 'NEW',
+                  currentGridTradeIndex: 0,
+                  nextCheck: '2020-01-01T23:59:00+00:00'
+                };
+              }
+              return null;
+            });
+
+          jest.mock('../../../trailingTradeHelper/order', () => ({
+            getGridTradeOrder: mockGetGridTradeOrder,
+            deleteGridTradeOrder: mockDeleteGridTradeOrder,
+            saveGridTradeOrder: mockSaveGridTradeOrder
           }));
 
           const step = require('../ensure-grid-trade-order-executed');
@@ -1861,6 +1702,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
               notifyDebug: false
             },
             symbolConfiguration: {
+              symbols: ['BTCUSDT', 'BNBUSDT'],
               buy: {
                 gridTrade: [
                   {
@@ -1904,19 +1746,6 @@ describe('ensure-grid-trade-order-executed.js', () => {
 
       describe('when orderParams/orderResult is empty for some reason', () => {
         beforeEach(async () => {
-          cacheMock.get = jest.fn().mockImplementation(key => {
-            if (key === `BTCUSDT-grid-trade-last-buy-order`) {
-              return JSON.stringify({
-                symbol: 'BTCUSDT',
-                side: 'BUY',
-                status: 'NEW',
-                currentGridTradeIndex: 0,
-                nextCheck: '2020-01-01T23:59:00.000Z'
-              });
-            }
-            return null;
-          });
-
           binanceMock.client.getOrder = jest.fn().mockResolvedValue({
             symbol: 'BNBUSDT',
             side: 'BUY',
@@ -1928,11 +1757,32 @@ describe('ensure-grid-trade-order-executed.js', () => {
             getAPILimit: mockGetAPILimit,
             isExceedAPILimit: mockIsExceedAPILimit,
             disableAction: mockDisableAction,
-            saveOrder: mockSaveOrder
+            saveOrderStats: mockSaveOrderStats
           }));
 
           jest.mock('../../../trailingTradeHelper/configuration', () => ({
             saveSymbolGridTrade: mockSaveSymbolGridTrade
+          }));
+
+          mockGetGridTradeOrder = jest
+            .fn()
+            .mockImplementation((_logger, key) => {
+              if (key === `BTCUSDT-grid-trade-last-buy-order`) {
+                return {
+                  symbol: 'BTCUSDT',
+                  side: 'BUY',
+                  status: 'NEW',
+                  currentGridTradeIndex: 0,
+                  nextCheck: '2020-01-01T23:59:00+00:00'
+                };
+              }
+              return null;
+            });
+
+          jest.mock('../../../trailingTradeHelper/order', () => ({
+            getGridTradeOrder: mockGetGridTradeOrder,
+            deleteGridTradeOrder: mockDeleteGridTradeOrder,
+            saveGridTradeOrder: mockSaveGridTradeOrder
           }));
 
           const step = require('../ensure-grid-trade-order-executed');
@@ -1945,6 +1795,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
               notifyDebug: false
             },
             symbolConfiguration: {
+              symbols: ['BTCUSDT', 'BNBUSDT'],
               buy: {
                 gridTrade: [
                   {
@@ -1990,19 +1841,6 @@ describe('ensure-grid-trade-order-executed.js', () => {
     describe('slackMessageOrderDeleted', () => {
       describe('when orderParams does not have type for some reason', () => {
         beforeEach(async () => {
-          cacheMock.get = jest.fn().mockImplementation(key => {
-            if (key === `BTCUSDT-grid-trade-last-buy-order`) {
-              return JSON.stringify({
-                symbol: 'BTCUSDT',
-                side: 'BUY',
-                status: 'NEW',
-                currentGridTradeIndex: 0,
-                nextCheck: '2020-01-01T23:59:00.000Z'
-              });
-            }
-            return null;
-          });
-
           binanceMock.client.getOrder = jest.fn().mockResolvedValue({
             symbol: 'BNBUSDT',
             side: 'BUY',
@@ -2015,11 +1853,32 @@ describe('ensure-grid-trade-order-executed.js', () => {
             getAPILimit: mockGetAPILimit,
             isExceedAPILimit: mockIsExceedAPILimit,
             disableAction: mockDisableAction,
-            saveOrder: mockSaveOrder
+            saveOrderStats: mockSaveOrderStats
           }));
 
           jest.mock('../../../trailingTradeHelper/configuration', () => ({
             saveSymbolGridTrade: mockSaveSymbolGridTrade
+          }));
+
+          mockGetGridTradeOrder = jest
+            .fn()
+            .mockImplementation((_logger, key) => {
+              if (key === `BTCUSDT-grid-trade-last-buy-order`) {
+                return {
+                  symbol: 'BTCUSDT',
+                  side: 'BUY',
+                  status: 'NEW',
+                  currentGridTradeIndex: 0,
+                  nextCheck: '2020-01-01T23:59:00+00:00'
+                };
+              }
+              return null;
+            });
+
+          jest.mock('../../../trailingTradeHelper/order', () => ({
+            getGridTradeOrder: mockGetGridTradeOrder,
+            deleteGridTradeOrder: mockDeleteGridTradeOrder,
+            saveGridTradeOrder: mockSaveGridTradeOrder
           }));
 
           const step = require('../ensure-grid-trade-order-executed');
@@ -2032,6 +1891,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
               notifyDebug: false
             },
             symbolConfiguration: {
+              symbols: ['BTCUSDT', 'BNBUSDT'],
               buy: {
                 gridTrade: [
                   {
@@ -2075,19 +1935,6 @@ describe('ensure-grid-trade-order-executed.js', () => {
 
       describe('when orderParams/orderResult is empty for some reason', () => {
         beforeEach(async () => {
-          cacheMock.get = jest.fn().mockImplementation(key => {
-            if (key === `BTCUSDT-grid-trade-last-buy-order`) {
-              return JSON.stringify({
-                symbol: 'BTCUSDT',
-                side: 'BUY',
-                status: 'NEW',
-                currentGridTradeIndex: 0,
-                nextCheck: '2020-01-01T23:59:00.000Z'
-              });
-            }
-            return null;
-          });
-
           binanceMock.client.getOrder = jest.fn().mockResolvedValue({
             symbol: 'BNBUSDT',
             side: 'BUY',
@@ -2099,11 +1946,32 @@ describe('ensure-grid-trade-order-executed.js', () => {
             getAPILimit: mockGetAPILimit,
             isExceedAPILimit: mockIsExceedAPILimit,
             disableAction: mockDisableAction,
-            saveOrder: mockSaveOrder
+            saveOrderStats: mockSaveOrderStats
           }));
 
           jest.mock('../../../trailingTradeHelper/configuration', () => ({
             saveSymbolGridTrade: mockSaveSymbolGridTrade
+          }));
+
+          mockGetGridTradeOrder = jest
+            .fn()
+            .mockImplementation((_logger, key) => {
+              if (key === `BTCUSDT-grid-trade-last-buy-order`) {
+                return {
+                  symbol: 'BTCUSDT',
+                  side: 'BUY',
+                  status: 'NEW',
+                  currentGridTradeIndex: 0,
+                  nextCheck: '2020-01-01T23:59:00+00:00'
+                };
+              }
+              return null;
+            });
+
+          jest.mock('../../../trailingTradeHelper/order', () => ({
+            getGridTradeOrder: mockGetGridTradeOrder,
+            deleteGridTradeOrder: mockDeleteGridTradeOrder,
+            saveGridTradeOrder: mockSaveGridTradeOrder
           }));
 
           const step = require('../ensure-grid-trade-order-executed');
@@ -2116,6 +1984,7 @@ describe('ensure-grid-trade-order-executed.js', () => {
               notifyDebug: false
             },
             symbolConfiguration: {
+              symbols: ['BTCUSDT', 'BNBUSDT'],
               buy: {
                 gridTrade: [
                   {

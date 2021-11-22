@@ -1,11 +1,28 @@
 const moment = require('moment');
-const { binance, slack, cache, PubSub } = require('../../../helpers');
+const { binance, slack, PubSub } = require('../../../helpers');
 const {
   getAPILimit,
   getAndCacheOpenOrdersForSymbol,
-  getAccountInfoFromAPI,
-  saveOrder
+  getAccountInfoFromAPI
 } = require('../../trailingTradeHelper/common');
+const { saveManualOrder } = require('../../trailingTradeHelper/order');
+
+/**
+ * Set message and return data
+ *
+ * @param {*} logger
+ * @param {*} rawData
+ * @param {*} processMessage
+ * @returns
+ */
+const setMessage = (logger, rawData, processMessage) => {
+  const data = rawData;
+
+  logger.info({ data, saveLog: true }, processMessage);
+  data.buy.processMessage = processMessage;
+  data.buy.updatedAt = moment().utc();
+  return data;
+};
 
 /**
  * Format order params for market total
@@ -136,6 +153,11 @@ const slackMessageOrderParams = async (logger, symbol, side, order, params) => {
     type += ` - ${marketType.toUpperCase()}`;
   }
 
+  logger.info(
+    { side, order, params, saveLog: true },
+    `The manual ${side.toUpperCase()} order will be placed.`
+  );
+
   return slack.sendMessage(
     `${symbol} Manual ${side.toUpperCase()} Action (${moment().format(
       'HH:mm:ss.SSS'
@@ -167,6 +189,11 @@ const slackMessageOrderResult = async (
   if (type === 'MARKET') {
     type += ` - ${marketType.toUpperCase()}`;
   }
+
+  logger.info(
+    { side, order, orderResult, saveLog: true },
+    `The manual ${side.toUpperCase()} order has been placed.`
+  );
 
   PubSub.publish('frontend-notification', {
     type: 'success',
@@ -200,25 +227,10 @@ const recordOrder = async (logger, orderResult, checkManualOrderPeriod) => {
 
   // Save manual order
   logger.info({ orderResult }, 'Record  order');
-  await cache.hset(
-    `trailing-trade-manual-order-${symbol}`,
-    orderId,
-    JSON.stringify({
-      ...orderResult,
-      nextCheck: moment().add(checkManualOrderPeriod, 'seconds')
-    })
-  );
 
-  // Save order
-  await saveOrder(logger, {
-    order: {
-      ...orderResult
-    },
-    botStatus: {
-      savedAt: moment().format(),
-      savedBy: 'place-manual-trade',
-      savedMessage: 'The manual order is placed.'
-    }
+  await saveManualOrder(logger, symbol, orderId, {
+    ...orderResult,
+    nextCheck: moment().add(checkManualOrderPeriod, 'seconds').format()
   });
 };
 
@@ -262,7 +274,7 @@ const execute = async (logger, rawData) => {
 
   const orderResult = await binance.client.order(orderParams);
 
-  logger.info({ orderResult }, 'Order result');
+  logger.info({ orderResult }, 'Manual order result');
 
   await recordOrder(logger, orderResult, checkManualOrderPeriod);
 
@@ -278,10 +290,8 @@ const execute = async (logger, rawData) => {
   data.accountInfo = await getAccountInfoFromAPI(logger);
 
   slackMessageOrderResult(logger, symbol, order.side, order, orderResult);
-  data.buy.processMessage = `Placed new manual order.`;
-  data.buy.updatedAt = moment().utc();
 
-  return data;
+  return setMessage(logger, data, `Placed new manual order.`);
 };
 
 module.exports = { execute };

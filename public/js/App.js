@@ -13,6 +13,7 @@ class App extends React.Component {
       packageVersion: '',
       gitHash: '',
       configuration: {},
+      orderStats: {},
       exchangeSymbols: [],
       symbols: [],
       apiInfo: {},
@@ -125,6 +126,7 @@ class App extends React.Component {
           isAuthenticated: response.isAuthenticated,
           botOptions: response.botOptions,
           configuration: response.configuration,
+          orderStats: response.common.orderStats,
           closedTradesSetting: _.get(
             response,
             ['common', 'closedTradesSetting'],
@@ -219,11 +221,13 @@ class App extends React.Component {
 
   render() {
     const {
+      webSocket: { connected },
       packageVersion,
       gitHash,
       exchangeSymbols,
       symbols,
       configuration,
+      orderStats,
       accountInfo,
       closedTradesSetting,
       closedTrades,
@@ -257,12 +261,22 @@ class App extends React.Component {
             index % 2 === 0 ? 'coin-wrapper-even' : 'coin-wrapper-odd'
           }
           key={'coin-wrapper-' + symbol.symbol}
+          connected={connected}
           isAuthenticated={isAuthenticated}
           symbolInfo={symbol}
           configuration={configuration}
           sendWebSocket={this.sendWebSocket}
         />
       );
+    });
+
+    const symbolEstimates = symbols.map(symbol => {
+      return {
+        baseAsset: symbol.symbolInfo.baseAsset,
+        quoteAsset: symbol.symbolInfo.quoteAsset,
+        estimatedValue: symbol.baseAssetBalance.estimatedValue,
+        tickSize: symbol.symbolInfo.filterPrice.tickSize
+      };
     });
 
     return (
@@ -287,6 +301,7 @@ class App extends React.Component {
                 accountInfo={accountInfo}
                 dustTransfer={dustTransfer}
                 sendWebSocket={this.sendWebSocket}
+                quoteEstimates={symbolEstimates}
               />
               <ProfitLossWrapper
                 isAuthenticated={isAuthenticated}
@@ -294,7 +309,9 @@ class App extends React.Component {
                 closedTradesSetting={closedTradesSetting}
                 closedTrades={closedTrades}
                 sendWebSocket={this.sendWebSocket}
+                symbolEstimates={symbolEstimates}
               />
+              <OrderStats orderStats={orderStats} />
             </div>
             <div className='coin-wrappers'>{coinWrappers}</div>
             <div className='app-body-footer-wrapper'>

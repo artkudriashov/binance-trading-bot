@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.85] - 2021-11-02
+
+- Refactored TradingView python server - [#383](https://github.com/chrisleekr/binance-trading-bot/pull/383)
+
+## [0.0.84] - 2021-10-30
+
+- Enhanced TradingView using get_multiple_analysis - [#375](https://github.com/chrisleekr/binance-trading-bot/pull/375)
+- Fixed the last buy removal threshold. Thanks [@Rayn0r](https://github.com/Rayn0r) - [#379](https://github.com/chrisleekr/binance-trading-bot/pull/379)
+
+## [0.0.83] - 2021-10-23
+
+- Fixed Redis/TradingView docker images for Raspberry Pi - [#366](https://github.com/chrisleekr/binance-trading-bot/pull/366)
+
+## [0.0.82] - 2021-10-23
+
+- Fixed Github actions
+
+## [0.0.81] - 2021-10-23
+
+- Fixed Github actions
+
+## [0.0.80] - 2021-10-22
+
+- Enhanced auto-trigger buy feature - [#316](https://github.com/chrisleekr/binance-trading-bot/issues/316)
+- Added TradingView Technical Analysis - [#327](https://github.com/chrisleekr/binance-trading-bot/issues/327)
+- Updated buy/auto-buy trigger/sell action to integrate with TradingView Technical Analysis - [#327](https://github.com/chrisleekr/binance-trading-bot/issues/327)
+- Fixed dust transfer base amount. Thanks  [@ilbuonmarcio](https://github.com/ilbuonmarcio) - [#346](https://github.com/chrisleekr/binance-trading-bot/pull/346)
+- Added `/status` endpoint. Thanks  [@ilbuonmarcio](https://github.com/ilbuonmarcio) - [#347](https://github.com/chrisleekr/binance-trading-bot/pull/347)
+- Added logging features for actions - [#362](https://github.com/chrisleekr/binance-trading-bot/pull/362)
+
+## [0.0.79] - 2021-09-19
+
+- Clear exchange/symbol info cache in the Redis periodically - [#284](https://github.com/chrisleekr/binance-trading-bot/issues/284)
+- Added minimum required order amount - [#84](https://github.com/chrisleekr/binance-trading-bot/issues/84)
+- Added estimates for quote assets. Thanks [@ilbuonmarcio](https://github.com/ilbuonmarcio) - [#305](https://github.com/chrisleekr/binance-trading-bot/pull/305)
+- Support limit for buy open orders/open trades - [#147](https://github.com/chrisleekr/binance-trading-bot/issues/147)
+- Fixed CRLF issue on Windows. Thanks  [@ilbuonmarcio](https://github.com/ilbuonmarcio) - [#326](https://github.com/chrisleekr/binance-trading-bot/pull/326)
+
+## [0.0.78] - 2021-09-05
+
+- Added indexes for MongoDB
+- Updated configuration to use cache as well to improve performance
+- Updated redis.conf to disable AOF for improving performance
+- Moved grid/manual orders to MongoDB from Redis since Redis is not persistent anymore
+- Updated MongoDB to not acknowledge insert/update/delete
+- Updated Slack message for authentication. Thanks [@caebwallace](https://github.com/caebwallace) - [#287](https://github.com/chrisleekr/binance-trading-bot/pull/287)
+- Support Redis DB. Thanks [@azorpax](https://github.com/azorpax) - [#292](https://github.com/chrisleekr/binance-trading-bot/pull/292)
+- Support Rate Limiter to prevent brute force. Thanks [@caebwallace](https://github.com/caebwallace) - [#287](https://github.com/chrisleekr/binance-trading-bot/pull/287)
+
+## [0.0.77] - 2021-08-27
+
+- Support setting minimum logging level. Thanks [@ruslan-khalitov](https://github.com/ruslan-khalitov) - [#280](https://github.com/chrisleekr/binance-trading-bot/pull/280)
+- Fixed cached symbol info is not removed when saving the global configuration
+
 ## [0.0.76] - 2021-08-17
 
 - Fixed profit calculation. Thanks [@Bajt1](https://github.com/Bajt1) - [#270](https://github.com/chrisleekr/binance-trading-bot/issues/270)

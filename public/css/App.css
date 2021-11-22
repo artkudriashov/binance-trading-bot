@@ -60,6 +60,14 @@ input[type='number'] {
   font-size: 0.8rem !important;
 }
 
+.fs-8 {
+  font-size: 0.7rem !important;
+}
+
+.fs-9 {
+  font-size: 0.6rem !important;
+}
+
 .w-10 {
   width: 10% !important;
 }
@@ -74,6 +82,10 @@ input[type='number'] {
 
 .w-30 {
   width: 30% !important;
+}
+
+.w-row-3 {
+  width: 33.33333% !important;
 }
 
 .w-40 {
@@ -197,6 +209,23 @@ input[type='number'] {
   font-size: 15px;
 }
 
+.coin-info-column-rows {
+  display: flex;
+  flex-flow: column wrap;
+}
+
+.coin-info-column-row {
+  display: flex;
+  flex-flow: row wrap;
+}
+
+.coin-info-column-row .coin-info-column {
+  flex: 1 1 auto;
+
+  border: 1px solid rgba(86, 61, 124, 0.15);
+  display: inline-block;
+}
+
 .accordion-wrapper {
   margin-bottom: 10px;
 }
@@ -279,6 +308,9 @@ input[type='number'] {
 .account-asset-row {
   display: flex;
   flex-flow: row wrap;
+}
+.account-asset-row-valignfix {
+  opacity: 0;
 }
 
 .account-asset-label {
@@ -433,6 +465,11 @@ input[type='number'] {
 .coin-info-value {
   flex: 1 auto;
   line-height: 23px;
+}
+
+.coin-info-column-tradingview .coin-info-label,
+.coin-info-column-tradingview .coin-info-value {
+  line-height: inherit;
 }
 
 .coin-info-label {
@@ -740,7 +777,7 @@ input[type='number'] {
   background-color: #272b38;
 
   display: flex;
-  flex-flow: row wrap;
+  flex-flow: row nowrap;
 }
 
 .profit-loss-asset {
@@ -773,6 +810,42 @@ input[type='number'] {
 
 /**
   End: Profit Loss
+*/
+
+/**
+  Start: Order Stats
+*/
+.order-stats-wrapper {
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  border-radius: 4px;
+
+  display: flex;
+  flex-flow: row nowrap;
+}
+
+.order-stat-wrapper {
+  margin-right: 10px;
+}
+
+.order-stat-label {
+  font-weight: bold;
+  margin-right: 3px;
+}
+
+.order-stat-value {
+  background-color: #272b38;
+
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  border-radius: 4px;
+
+  width: 15px;
+  display: inline-block;
+  text-align: center;
+}
+/**
+  End: Order Stats
 */
 
 /**
@@ -888,3 +961,7 @@ input[type='number'] {
 /**
   End: Trade Modal
 */
+
+.tradingview-widget-container iframe {
+  overflow-y: none;
+}

@@ -19,6 +19,8 @@ const {
   getOpenOrders,
   executeDustTransfer,
   getClosedTrades,
+  getOrderStats,
+  getTradingView,
   saveDataToCache
 } = require('./trailingTradeIndicator/steps');
 const { slack } = require('../helpers');
@@ -40,6 +42,7 @@ const execute = async logger => {
     openOrders: [],
     overrideParams: {},
     quoteAssetStats: {},
+    tradingView: {},
     apiLimit: { start: getAPILimit(logger), end: null }
   };
 
@@ -102,6 +105,14 @@ const execute = async logger => {
         stepFunc: getClosedTrades
       },
       {
+        stepName: 'get-order-stats',
+        stepFunc: getOrderStats
+      },
+      {
+        stepName: 'get-tradingview',
+        stepFunc: getTradingView
+      },
+      {
         stepName: 'save-data-to-cache',
         stepFunc: saveDataToCache
       }
@@ -127,6 +138,12 @@ const execute = async logger => {
 
     logger.info({ symbol, data }, 'TrailingTradeIndicator: Finish process...');
   } catch (err) {
+    // For the redlock fail
+    if (err.message.includes('redlock')) {
+      // Simply ignore
+      return;
+    }
+
     logger.error(
       { symbol: data.symbol, err, debug: true },
       `⚠ Execution failed.`

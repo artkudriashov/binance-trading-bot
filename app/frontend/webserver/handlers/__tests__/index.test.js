@@ -7,6 +7,12 @@ describe('index', () => {
   let mockHandleGridTradeArchiveDelete;
   let mockHandleClosedTradesSetPeriod;
   let mockHandle404;
+  let mockHandleStatus;
+  let mockHandleGridTradeLogsGet;
+  let mockHandleGridTradeLogsExport;
+
+  let mockLoginLimiter;
+
   beforeEach(async () => {
     jest.clearAllMocks().resetModules();
 
@@ -15,6 +21,11 @@ describe('index', () => {
     mockHandleGridTradeArchiveDelete = jest.fn().mockResolvedValue(true);
     mockHandleClosedTradesSetPeriod = jest.fn().mockResolvedValue(true);
     mockHandle404 = jest.fn().mockResolvedValue(true);
+    mockHandleStatus = jest.fn().mockResolvedValue(true);
+    mockHandleGridTradeLogsGet = jest.fn().mockResolvedValue(true);
+    mockHandleGridTradeLogsExport = jest.fn().mockResolvedValue(true);
+
+    mockLoginLimiter = jest.fn().mockReturnValue(true);
 
     jest.mock('../auth', () => ({
       handleAuth: mockHandleAuth
@@ -32,16 +43,32 @@ describe('index', () => {
       handleClosedTradesSetPeriod: mockHandleClosedTradesSetPeriod
     }));
 
+    jest.mock('../grid-trade-logs-get', () => ({
+      handleGridTradeLogsGet: mockHandleGridTradeLogsGet
+    }));
+
+    jest.mock('../grid-trade-logs-export', () => ({
+      handleGridTradeLogsExport: mockHandleGridTradeLogsExport
+    }));
+
     jest.mock('../404', () => ({
       handle404: mockHandle404
     }));
 
+    jest.mock('../status', () => ({
+      handleStatus: mockHandleStatus
+    }));
+
     index = require('../index');
-    await index.setHandlers('logger', 'app');
+    await index.setHandlers('logger', 'app', {
+      loginLimiter: mockLoginLimiter
+    });
   });
 
   it('triggers handleAuth', () => {
-    expect(mockHandle404).toHaveBeenCalledWith('logger', 'app');
+    expect(mockHandleAuth).toHaveBeenCalledWith('logger', 'app', {
+      loginLimiter: mockLoginLimiter
+    });
   });
 
   it('triggers handleGridTradeArchiveGet', () => {
@@ -60,6 +87,18 @@ describe('index', () => {
       'logger',
       'app'
     );
+  });
+
+  it('triggers handleGridTradeLogsGet', () => {
+    expect(mockHandleGridTradeLogsGet).toHaveBeenCalledWith('logger', 'app');
+  });
+
+  it('triggers handleGridTradeLogsExport', () => {
+    expect(mockHandleGridTradeLogsExport).toHaveBeenCalledWith('logger', 'app');
+  });
+
+  it('triggers handleStatus', () => {
+    expect(mockHandleStatus).toHaveBeenCalledWith('logger', 'app');
   });
 
   it('triggers handle404', () => {

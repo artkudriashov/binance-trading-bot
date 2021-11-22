@@ -3,14 +3,33 @@
 /* eslint-disable no-undef */
 class AccountWrapper extends React.Component {
   render() {
-    const { accountInfo, dustTransfer, sendWebSocket, isAuthenticated } =
-      this.props;
+    const {
+      accountInfo,
+      dustTransfer,
+      sendWebSocket,
+      isAuthenticated,
+      quoteEstimates
+    } = this.props;
 
     const assets = accountInfo.balances.map((balance, index) => {
+      let quoteEstimate = quoteEstimates.filter(
+        elem => elem.baseAsset === balance.asset
+      );
+
+      if (quoteEstimate.length == 1) {
+        quoteEstimate = {
+          quote: quoteEstimate[0]['quoteAsset'],
+          estimate: quoteEstimate[0]['estimatedValue']
+        };
+      } else {
+        quoteEstimate = null;
+      }
+
       return (
         <AccountWrapperAsset
           key={`account-wrapper-` + index}
-          balance={balance}></AccountWrapperAsset>
+          balance={balance}
+          quoteEstimate={quoteEstimate}></AccountWrapperAsset>
       );
     });
 
@@ -24,8 +43,8 @@ class AccountWrapper extends React.Component {
               className='px-2 py-1'>
               <button
                 type='button'
-                className='btn btn-sm btn-link btn-account-balance text-uppercase font-weight-bold'>
-                Account Balance
+                className='btn btn-sm btn-link btn-account-balance text-uppercase font-weight-bold text-left'>
+                <span className='pr-2'>Account Balance</span>
               </button>
             </Accordion.Toggle>
             <Accordion.Collapse eventKey='0'>

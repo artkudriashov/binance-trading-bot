@@ -1,6 +1,7 @@
 {
   "mode": "test",
   "tz": "Australia/Melbourne",
+  "appName": "Binance Trading Bot",
   "binance": {
     "live": {
       "apiKey": "",
@@ -14,7 +15,8 @@
   "redis": {
     "host": "binance-redis",
     "port": 6379,
-    "password": ""
+    "password": "",
+    "db": 0
   },
   "mongo": {
     "host": "binance-mongo",
@@ -38,7 +40,12 @@
   },
   "authentication": {
     "enabled": true,
-    "password": "123456"
+    "password": "123456",
+    "loginLimiter": {
+      "maxConsecutiveFails": 5,
+      "duration": 10800,
+      "blockDuration": 900
+    }
   },
   "jobs": {
     "alive": {
@@ -56,7 +63,28 @@
         },
         "autoTriggerBuy": {
           "enabled": false,
-          "triggerAfter": 20
+          "triggerAfter": 20,
+          "conditions": {
+            "whenLessThanATHRestriction": true,
+            "afterDisabledPeriod": true,
+            "tradingView": {
+              "whenStrongBuy": true,
+              "whenBuy": true
+            }
+          }
+        },
+        "orderLimit": {
+          "enabled": true,
+          "maxBuyOpenOrders": 3,
+          "maxOpenTrades": 5
+        },
+        "tradingView": {
+          "interval": "",
+          "useOnlyWithin": 5,
+          "ifExpires": "ignore"
+        },
+        "logs": {
+          "deleteAfter": 30
         }
       },
       "candles": {
@@ -70,6 +98,8 @@
             "triggerPercentage": 1,
             "stopPercentage": 1.02,
             "limitPercentage": 1.021,
+            "minPurchaseAmount": -1,
+            "minPurchaseAmounts": {},
             "maxPurchaseAmount": -1,
             "maxPurchaseAmounts": {}
           }
@@ -83,6 +113,10 @@
             "limit": 30
           },
           "restrictionPercentage": 0.9
+        },
+        "tradingView": {
+          "whenStrongBuy": true,
+          "whenBuy": true
         }
       },
       "sell": {
@@ -101,6 +135,13 @@
           "maxLossPercentage": 0.8,
           "disableBuyMinutes": 360,
           "orderType": "market"
+        },
+        "tradingView": {
+          "forceSellOverZeroBelowTriggerPrice": {
+            "whenNeutral": false,
+            "whenSell": false,
+            "whenStrongSell": false
+          }
         }
       },
       "system": {

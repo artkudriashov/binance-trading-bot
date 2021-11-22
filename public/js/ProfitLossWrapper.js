@@ -112,7 +112,8 @@ class ProfitLossWrapper extends React.Component {
   }
 
   render() {
-    const { sendWebSocket, isAuthenticated, closedTrades } = this.props;
+    const { sendWebSocket, isAuthenticated, closedTrades, symbolEstimates } =
+      this.props;
     const { totalPnL, symbols, selectedPeriod, closedTradesLoading } =
       this.state;
 
@@ -120,7 +121,26 @@ class ProfitLossWrapper extends React.Component {
       return '';
     }
 
+    const groupedEstimates = {};
+    symbolEstimates.forEach(symbol => {
+      if (groupedEstimates[symbol.quoteAsset] === undefined) {
+        groupedEstimates[symbol.quoteAsset] = {
+          value: 0,
+          quotePrecision:
+            parseFloat(symbol.tickSize) === 1
+              ? 0
+              : symbol.tickSize.indexOf(1) - 1
+        };
+      }
+
+      groupedEstimates[symbol.quoteAsset].value += symbol.estimatedValue;
+    });
+
     const openTradeWrappers = Object.values(totalPnL).map((pnl, index) => {
+      if (groupedEstimates[pnl.asset] === undefined) {
+        return '';
+      }
+
       const percentage =
         pnl.amount > 0 ? ((pnl.profit / pnl.amount) * 100).toFixed(2) : 0;
       return (
@@ -128,12 +148,20 @@ class ProfitLossWrapper extends React.Component {
           key={`open-trade-pnl-` + index}
           className='profit-loss-wrapper pt-2 pl-2 pr-2 pb-0'>
           <div className='profit-loss-wrapper-body'>
-            <span className='profit-loss-asset'>{pnl.asset}</span>{' '}
-            <span className='profit-loss-value'>
+            <div className='profit-loss-asset'>
+              {pnl.asset}
+              <br />
+              <div className='text-success text-truncate'>
+                {groupedEstimates[pnl.asset].value.toFixed(
+                  groupedEstimates[pnl.asset].quotePrecision
+                )}
+              </div>
+            </div>{' '}
+            <div className='profit-loss-value'>
               {pnl.profit > 0 ? '+' : ''}
               {pnl.profit.toFixed(5)}
               <br />({percentage}%)
-            </span>
+            </div>
           </div>
         </div>
       );
@@ -175,8 +203,8 @@ class ProfitLossWrapper extends React.Component {
               <Card.Header className='px-2 py-1'>
                 <div className='d-flex flex-row justify-content-between'>
                   <div className='flex-column-left'>
-                    <div className='btn-profit-loss text-uppercase font-weight-bold'>
-                      Open Trades{' '}
+                    <div className='btn-profit-loss text-uppercase text-left font-weight-bold'>
+                      <span>Open Trades</span>{' '}
                       <OverlayTrigger
                         trigger='click'
                         key='profit-loss-overlay'
@@ -195,7 +223,7 @@ class ProfitLossWrapper extends React.Component {
                         }>
                         <Button
                           variant='link'
-                          className='p-0 m-0 ml-1 text-info'>
+                          className='p-0 m-0 ml-1 text-info align-baseline'>
                           <i className='fas fa-question-circle fa-sm'></i>
                         </Button>
                       </OverlayTrigger>
@@ -253,7 +281,7 @@ class ProfitLossWrapper extends React.Component {
                         }>
                         <Button
                           variant='link'
-                          className='p-0 m-0 ml-1 text-info'>
+                          className='p-0 m-0 ml-1 text-info align-baseline'>
                           <i className='fas fa-question-circle fa-sm'></i>
                         </Button>
                       </OverlayTrigger>

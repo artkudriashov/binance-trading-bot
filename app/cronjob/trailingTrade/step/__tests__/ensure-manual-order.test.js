@@ -8,15 +8,18 @@ describe('ensure-manual-order.js', () => {
   let binanceMock;
   let slackMock;
   let loggerMock;
-  let cacheMock;
   let PubSubMock;
 
   let mockCalculateLastBuyPrice;
   let mockGetAPILimit;
-  let mockSaveOrder;
+  let mockIsExceedAPILimit;
 
   let mockGetSymbolGridTrade;
   let mockSaveSymbolGridTrade;
+
+  let mockGetManualOrders;
+  let mockDeleteManualOrder;
+  let mockSaveManualOrder;
 
   describe('execute', () => {
     beforeEach(() => {
@@ -24,23 +27,12 @@ describe('ensure-manual-order.js', () => {
     });
 
     beforeEach(async () => {
-      const {
-        binance,
-        slack,
-        cache,
-        logger,
-        PubSub
-      } = require('../../../../helpers');
+      const { binance, slack, logger, PubSub } = require('../../../../helpers');
 
       binanceMock = binance;
       slackMock = slack;
       loggerMock = logger;
-      cacheMock = cache;
       PubSubMock = PubSub;
-
-      cacheMock.hgetall = jest.fn().mockResolvedValue(null);
-      cacheMock.hdel = jest.fn().mockResolvedValue(true);
-      cacheMock.hset = jest.fn().mockResolvedValue(true);
 
       PubSubMock.publish = jest.fn().mockResolvedValue(true);
 
@@ -49,7 +41,13 @@ describe('ensure-manual-order.js', () => {
 
       mockCalculateLastBuyPrice = jest.fn().mockResolvedValue(true);
       mockGetAPILimit = jest.fn().mockResolvedValue(10);
-      mockSaveOrder = jest.fn().mockResolvedValue(true);
+      mockIsExceedAPILimit = jest.fn().mockReturnValue(false);
+
+      jest.mock('../../../trailingTradeHelper/common', () => ({
+        calculateLastBuyPrice: mockCalculateLastBuyPrice,
+        getAPILimit: mockGetAPILimit,
+        isExceedAPILimit: mockIsExceedAPILimit
+      }));
 
       mockGetSymbolGridTrade = jest.fn().mockResolvedValue({
         buy: [
@@ -60,14 +58,20 @@ describe('ensure-manual-order.js', () => {
         sell: [{ some: 'value' }]
       });
       mockSaveSymbolGridTrade = jest.fn().mockResolvedValue(true);
+
+      mockGetManualOrders = jest.fn().mockResolvedValue(null);
+      mockDeleteManualOrder = jest.fn().mockResolvedValue(true);
+      mockSaveManualOrder = jest.fn().mockResolvedValue(true);
     });
 
-    describe('when manual buy order is not available', () => {
+    describe('when api limit exceeded', () => {
       beforeEach(async () => {
+        mockIsExceedAPILimit = jest.fn().mockReturnValue(true);
+
         jest.mock('../../../trailingTradeHelper/common', () => ({
           calculateLastBuyPrice: mockCalculateLastBuyPrice,
           getAPILimit: mockGetAPILimit,
-          saveOrder: mockSaveOrder
+          isExceedAPILimit: mockIsExceedAPILimit
         }));
 
         jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -75,7 +79,11 @@ describe('ensure-manual-order.js', () => {
           saveSymbolGridTrade: mockSaveSymbolGridTrade
         }));
 
-        cacheMock.hgetall = jest.fn().mockResolvedValue(null);
+        jest.mock('../../../trailingTradeHelper/order', () => ({
+          getManualOrders: mockGetManualOrders,
+          deleteManualOrder: mockDeleteManualOrder,
+          saveManualOrder: mockSaveManualOrder
+        }));
 
         const step = require('../ensure-manual-order');
 
@@ -97,16 +105,79 @@ describe('ensure-manual-order.js', () => {
         expect(binanceMock.client.getOrder).not.toHaveBeenCalled();
       });
 
-      it('does not trigger cache.hdel', () => {
-        expect(cacheMock.hdel).not.toHaveBeenCalled();
+      it('does not trigger deleteManualOrder', () => {
+        expect(mockDeleteManualOrder).not.toHaveBeenCalled();
       });
 
       it('does not trigger saveSymbolGridTrade', () => {
         expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
       });
 
-      it('does not trigger saveOrder', () => {
-        expect(mockSaveOrder).not.toHaveBeenCalled();
+      it('does not trigger saveManualOrder', () => {
+        expect(mockSaveManualOrder).not.toHaveBeenCalled();
+      });
+
+      it('does not trigger calculateLastBuyPrice', () => {
+        expect(mockCalculateLastBuyPrice).not.toHaveBeenCalled();
+      });
+
+      it('returns expected result', () => {
+        expect(result).toStrictEqual({
+          symbol: 'BTCUSDT',
+          isLocked: false,
+          featureToggle: { notifyDebug: true },
+          symbolConfiguration: {
+            system: {
+              checkManualOrderPeriod: 10
+            }
+          }
+        });
+      });
+    });
+
+    describe('when manual buy order is not available', () => {
+      beforeEach(async () => {
+        jest.mock('../../../trailingTradeHelper/configuration', () => ({
+          getSymbolGridTrade: mockGetSymbolGridTrade,
+          saveSymbolGridTrade: mockSaveSymbolGridTrade
+        }));
+
+        jest.mock('../../../trailingTradeHelper/order', () => ({
+          getManualOrders: mockGetManualOrders,
+          deleteManualOrder: mockDeleteManualOrder,
+          saveManualOrder: mockSaveManualOrder
+        }));
+
+        const step = require('../ensure-manual-order');
+
+        rawData = {
+          symbol: 'BTCUSDT',
+          isLocked: false,
+          featureToggle: { notifyDebug: true },
+          symbolConfiguration: {
+            system: {
+              checkManualOrderPeriod: 10
+            }
+          }
+        };
+
+        result = await step.execute(loggerMock, rawData);
+      });
+
+      it('does not trigger binance.client.getOrder', () => {
+        expect(binanceMock.client.getOrder).not.toHaveBeenCalled();
+      });
+
+      it('does not trigger deleteManualOrder', () => {
+        expect(mockDeleteManualOrder).not.toHaveBeenCalled();
+      });
+
+      it('does not trigger saveSymbolGridTrade', () => {
+        expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
+      });
+
+      it('does not trigger saveManualOrder', () => {
+        expect(mockSaveManualOrder).not.toHaveBeenCalled();
       });
 
       it('does not trigger calculateLastBuyPrice', () => {
@@ -138,17 +209,20 @@ describe('ensure-manual-order.js', () => {
           },
           featureToggle: { notifyDebug: false },
           orderId: 159653829,
-          cacheResults: {
-            159653829: JSON.stringify({
-              symbol: 'CAKEUSDT',
-              orderId: 159653829,
-              executedQty: '1.00000000',
-              cummulativeQuoteQty: '19.54900000',
-              status: 'FILLED',
-              type: 'LIMIT',
-              side: 'BUY'
-            })
-          }
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 159653829,
+                executedQty: '1.00000000',
+                cummulativeQuoteQty: '19.54900000',
+                status: 'FILLED',
+                type: 'LIMIT',
+                side: 'BUY'
+              }
+            }
+          ],
+          expectedCalculateLastBuyPrice: true
         },
         {
           desc: 'with MARKET order and has no existing last buy price',
@@ -156,26 +230,29 @@ describe('ensure-manual-order.js', () => {
           lastBuyPriceDoc: null,
           featureToggle: { notifyDebug: true },
           orderId: 2371284112,
-          cacheResults: {
-            2371284112: JSON.stringify({
-              symbol: 'BNBUSDT',
-              orderId: 2371284112,
-              executedQty: '0.12300000',
-              cummulativeQuoteQty: '49.99581000',
-              status: 'FILLED',
-              type: 'MARKET',
-              side: 'BUY',
-              fills: [
-                {
-                  price: '406.47000000',
-                  qty: '0.12300000',
-                  commission: '0.00009225',
-                  commissionAsset: 'BNB',
-                  tradeId: 318836332
-                }
-              ]
-            })
-          }
+          cacheResults: [
+            {
+              order: {
+                symbol: 'BNBUSDT',
+                orderId: 2371284112,
+                executedQty: '0.12300000',
+                cummulativeQuoteQty: '49.99581000',
+                status: 'FILLED',
+                type: 'MARKET',
+                side: 'BUY',
+                fills: [
+                  {
+                    price: '406.47000000',
+                    qty: '0.12300000',
+                    commission: '0.00009225',
+                    commissionAsset: 'BNB',
+                    tradeId: 318836332
+                  }
+                ]
+              }
+            }
+          ],
+          expectedCalculateLastBuyPrice: true
         },
         {
           desc: 'with MARKET order and has existing last buy price',
@@ -186,44 +263,80 @@ describe('ensure-manual-order.js', () => {
           },
           featureToggle: { notifyDebug: false },
           orderId: 160868057,
-          cacheResults: {
-            160868057: JSON.stringify({
-              symbol: 'CAKEUSDT',
-              orderId: 160868057,
-              executedQty: '3.00000000',
-              cummulativeQuoteQty: '61.33200000',
-              status: 'FILLED',
-              type: 'MARKET',
-              side: 'BUY',
-              fills: [
-                {
-                  price: '20.44400000',
-                  qty: '3.00000000',
-                  commission: '0.00010912',
-                  commissionAsset: 'BNB',
-                  tradeId: 26893880
-                }
-              ]
-            })
-          }
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 160868057,
+                executedQty: '3.00000000',
+                cummulativeQuoteQty: '61.33200000',
+                status: 'FILLED',
+                type: 'MARKET',
+                side: 'BUY',
+                fills: [
+                  {
+                    price: '20.44400000',
+                    qty: '3.00000000',
+                    commission: '0.00010912',
+                    commissionAsset: 'BNB',
+                    tradeId: 26893880
+                  }
+                ]
+              }
+            }
+          ],
+          expectedCalculateLastBuyPrice: true
+        },
+        {
+          desc: 'Sell with MARKET order and has existing last buy price',
+          symbol: 'BNBUSDT',
+          lastBuyPriceDoc: {
+            lastBuyPrice: 20.782000000000004,
+            quantity: 2.405
+          },
+          featureToggle: { notifyDebug: false },
+          orderId: 160868057,
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 160868057,
+                executedQty: '3.00000000',
+                cummulativeQuoteQty: '61.33200000',
+                status: 'FILLED',
+                type: 'MARKET',
+                side: 'SELL',
+                fills: [
+                  {
+                    price: '20.44400000',
+                    qty: '3.00000000',
+                    commission: '0.00010912',
+                    commissionAsset: 'BNB',
+                    tradeId: 26893880
+                  }
+                ]
+              }
+            }
+          ],
+          expectedCalculateLastBuyPrice: false
         }
       ].forEach(testData => {
         describe(`${testData.desc}`, () => {
           beforeEach(async () => {
-            jest.mock('../../../trailingTradeHelper/common', () => ({
-              calculateLastBuyPrice: mockCalculateLastBuyPrice,
-              getAPILimit: mockGetAPILimit,
-              saveOrder: mockSaveOrder
-            }));
-
             jest.mock('../../../trailingTradeHelper/configuration', () => ({
               getSymbolGridTrade: mockGetSymbolGridTrade,
               saveSymbolGridTrade: mockSaveSymbolGridTrade
             }));
 
-            cacheMock.hgetall = jest
+            mockGetManualOrders = jest
               .fn()
               .mockResolvedValue(testData.cacheResults);
+
+            jest.mock('../../../trailingTradeHelper/order', () => ({
+              getManualOrders: mockGetManualOrders,
+              deleteManualOrder: mockDeleteManualOrder,
+              saveManualOrder: mockSaveManualOrder
+            }));
 
             const step = require('../ensure-manual-order');
 
@@ -241,17 +354,24 @@ describe('ensure-manual-order.js', () => {
             result = await step.execute(loggerMock, rawData);
           });
 
-          it('triggers calculateLastBuyPrice', () => {
-            expect(mockCalculateLastBuyPrice).toHaveBeenCalledWith(
+          if (testData.expectedCalculateLastBuyPrice) {
+            it('triggers calculateLastBuyPrice', () => {
+              expect(mockCalculateLastBuyPrice).toHaveBeenCalledWith(
+                loggerMock,
+                testData.symbol,
+                testData.cacheResults[0].order
+              );
+            });
+          } else {
+            it('does not trigger calculateLastBuyPrice', () => {
+              expect(mockCalculateLastBuyPrice).not.toHaveBeenCalled();
+            });
+          }
+
+          it('triggers deleteManualOrder', () => {
+            expect(mockDeleteManualOrder).toHaveBeenCalledWith(
               loggerMock,
               testData.symbol,
-              JSON.parse(testData.cacheResults[testData.orderId])
-            );
-          });
-
-          it('triggers cache.hdel', () => {
-            expect(cacheMock.hdel).toHaveBeenCalledWith(
-              `trailing-trade-manual-order-${testData.symbol}`,
               testData.orderId
             );
           });
@@ -274,29 +394,15 @@ describe('ensure-manual-order.js', () => {
                   }
                 ],
                 sell: [{ some: 'value' }],
-                manualTrade: [
-                  JSON.parse(testData.cacheResults[testData.orderId])
-                ]
+                manualTrade: [testData.cacheResults[0].order]
               }
             );
-          });
-
-          it('triggers saveOrder', () => {
-            expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-              order: JSON.parse(testData.cacheResults[testData.orderId]),
-              botStatus: {
-                savedAt: expect.any(String),
-                savedBy: 'ensure-manual-order',
-                savedMessage:
-                  'The order has already filled and updated the last buy price.'
-              }
-            });
           });
         });
       });
     });
 
-    describe('when manual buy order is not filled', () => {
+    describe('when manual order is not filled', () => {
       [
         {
           desc: 'with LIMIT order and FILLED',
@@ -307,21 +413,23 @@ describe('ensure-manual-order.js', () => {
           },
           featureToggle: { notifyDebug: false },
           orderId: 159653829,
-          cacheResults: {
-            159653829: JSON.stringify({
-              symbol: 'CAKEUSDT',
-              orderId: 159653829,
-              origQty: '1.00000000',
-              executedQty: '1.00000000',
-              cummulativeQuoteQty: '19.54900000',
-              status: 'NEW',
-              type: 'LIMIT',
-              side: 'BUY',
-              nextCheck: moment()
-                .subtract(1, 'minute')
-                .format('YYYY-MM-DDTHH:mm:ssZ')
-            })
-          },
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 159653829,
+                origQty: '1.00000000',
+                executedQty: '1.00000000',
+                cummulativeQuoteQty: '19.54900000',
+                status: 'NEW',
+                type: 'LIMIT',
+                side: 'BUY',
+                nextCheck: moment()
+                  .subtract(1, 'minute')
+                  .format('YYYY-MM-DDTHH:mm:ssZ')
+              }
+            }
+          ],
           getOrderResult: {
             symbol: 'CAKEUSDT',
             orderId: 159653829,
@@ -331,7 +439,8 @@ describe('ensure-manual-order.js', () => {
             type: 'LIMIT',
             side: 'BUY'
           },
-          expectedCalculateLastBuyPrice: true
+          expectedCalculateLastBuyPrice: true,
+          expectedFilledOrder: true
         },
         {
           desc: 'with MARKET order and FILLED',
@@ -342,21 +451,23 @@ describe('ensure-manual-order.js', () => {
           },
           featureToggle: { notifyDebug: true },
           orderId: 159653829,
-          cacheResults: {
-            159653829: JSON.stringify({
-              symbol: 'CAKEUSDT',
-              orderId: 159653829,
-              origQty: '1.00000000',
-              executedQty: '1.00000000',
-              cummulativeQuoteQty: '19.54900000',
-              status: 'NEW',
-              type: 'MARKET',
-              side: 'BUY',
-              nextCheck: moment()
-                .subtract(5, 'minute')
-                .format('YYYY-MM-DDTHH:mm:ssZ')
-            })
-          },
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 159653829,
+                origQty: '1.00000000',
+                executedQty: '1.00000000',
+                cummulativeQuoteQty: '19.54900000',
+                status: 'NEW',
+                type: 'MARKET',
+                side: 'BUY',
+                nextCheck: moment()
+                  .subtract(5, 'minute')
+                  .format('YYYY-MM-DDTHH:mm:ssZ')
+              }
+            }
+          ],
           getOrderResult: {
             symbol: 'CAKEUSDT',
             orderId: 159653829,
@@ -366,7 +477,46 @@ describe('ensure-manual-order.js', () => {
             type: 'MARKET',
             side: 'BUY'
           },
-          expectedCalculateLastBuyPrice: true
+          expectedCalculateLastBuyPrice: true,
+          expectedFilledOrder: true
+        },
+        {
+          desc: 'Sell with MARKET order and FILLED',
+          symbol: 'CAKEUSDT',
+          lastBuyPriceDoc: {
+            lastBuyPrice: 30,
+            quantity: 3
+          },
+          featureToggle: { notifyDebug: true },
+          orderId: 159653829,
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 159653829,
+                origQty: '1.00000000',
+                executedQty: '1.00000000',
+                cummulativeQuoteQty: '19.54900000',
+                status: 'NEW',
+                type: 'MARKET',
+                side: 'SELL',
+                nextCheck: moment()
+                  .subtract(5, 'minute')
+                  .format('YYYY-MM-DDTHH:mm:ssZ')
+              }
+            }
+          ],
+          getOrderResult: {
+            symbol: 'CAKEUSDT',
+            orderId: 159653829,
+            executedQty: '1.00000000',
+            cummulativeQuoteQty: '19.54900000',
+            status: 'FILLED',
+            type: 'MARKET',
+            side: 'SELL'
+          },
+          expectedCalculateLastBuyPrice: false,
+          expectedFilledOrder: true
         },
         {
           desc: 'with MARKET order and FILLED, but not yet to check',
@@ -377,21 +527,23 @@ describe('ensure-manual-order.js', () => {
           },
           featureToggle: { notifyDebug: false },
           orderId: 159653829,
-          cacheResults: {
-            159653829: JSON.stringify({
-              symbol: 'CAKEUSDT',
-              orderId: 159653829,
-              origQty: '1.00000000',
-              executedQty: '1.00000000',
-              cummulativeQuoteQty: '19.54900000',
-              status: 'NEW',
-              type: 'MARKET',
-              side: 'BUY',
-              nextCheck: moment()
-                .add(5, 'minute')
-                .format('YYYY-MM-DDTHH:mm:ssZ')
-            })
-          },
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 159653829,
+                origQty: '1.00000000',
+                executedQty: '1.00000000',
+                cummulativeQuoteQty: '19.54900000',
+                status: 'NEW',
+                type: 'MARKET',
+                side: 'BUY',
+                nextCheck: moment()
+                  .add(5, 'minute')
+                  .format('YYYY-MM-DDTHH:mm:ssZ')
+              }
+            }
+          ],
           getOrderResult: {
             symbol: 'CAKEUSDT',
             orderId: 159653829,
@@ -401,20 +553,59 @@ describe('ensure-manual-order.js', () => {
             type: 'MARKET',
             side: 'BUY'
           },
-          expectedCalculateLastBuyPrice: false
+          expectedCalculateLastBuyPrice: false,
+          expectedFilledOrder: false
+        },
+        {
+          desc: 'with MARKET order and FILLED, but not yet to check',
+          symbol: 'CAKEUSDT',
+          lastBuyPriceDoc: {
+            lastBuyPrice: 30,
+            quantity: 3
+          },
+          featureToggle: { notifyDebug: false },
+          orderId: 159653829,
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 159653829,
+                origQty: '1.00000000',
+                executedQty: '1.00000000',
+                cummulativeQuoteQty: '19.54900000',
+                status: 'NEW',
+                type: 'MARKET',
+                side: 'SELL',
+                nextCheck: moment()
+                  .add(5, 'minute')
+                  .format('YYYY-MM-DDTHH:mm:ssZ')
+              }
+            }
+          ],
+          getOrderResult: {
+            symbol: 'CAKEUSDT',
+            orderId: 159653829,
+            executedQty: '1.00000000',
+            cummulativeQuoteQty: '19.54900000',
+            status: 'FILLED',
+            type: 'MARKET',
+            side: 'SELL'
+          },
+          expectedCalculateLastBuyPrice: false,
+          expectedFilledOrder: false
         }
       ].forEach(testData => {
         describe(`${testData.desc}`, () => {
           beforeEach(async () => {
-            jest.mock('../../../trailingTradeHelper/common', () => ({
-              calculateLastBuyPrice: mockCalculateLastBuyPrice,
-              getAPILimit: mockGetAPILimit,
-              saveOrder: mockSaveOrder
-            }));
-
-            cacheMock.hgetall = jest
+            mockGetManualOrders = jest
               .fn()
               .mockResolvedValue(testData.cacheResults);
+
+            jest.mock('../../../trailingTradeHelper/order', () => ({
+              getManualOrders: mockGetManualOrders,
+              deleteManualOrder: mockDeleteManualOrder,
+              saveManualOrder: mockSaveManualOrder
+            }));
 
             binanceMock.client.getOrder = jest
               .fn()
@@ -444,10 +635,17 @@ describe('ensure-manual-order.js', () => {
                 testData.getOrderResult
               );
             });
+          } else {
+            it('does not trigger calculateLastBuyPrice', () => {
+              expect(mockCalculateLastBuyPrice).not.toHaveBeenCalled();
+            });
+          }
 
-            it('triggers cache.hdel', () => {
-              expect(cacheMock.hdel).toHaveBeenCalledWith(
-                `trailing-trade-manual-order-${testData.symbol}`,
+          if (testData.expectedFilledOrder) {
+            it('triggers deleteManualOrder', () => {
+              expect(mockDeleteManualOrder).toHaveBeenCalledWith(
+                loggerMock,
+                testData.symbol,
                 testData.orderId
               );
             });
@@ -474,28 +672,9 @@ describe('ensure-manual-order.js', () => {
                 }
               );
             });
-
-            it('triggers saveOrder', () => {
-              expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-                order: {
-                  ...JSON.parse(testData.cacheResults[testData.orderId]),
-                  ...testData.getOrderResult
-                },
-                botStatus: {
-                  savedAt: expect.any(String),
-                  savedBy: 'ensure-manual-order',
-                  savedMessage:
-                    'The order has filled and updated the last buy price.'
-                }
-              });
-            });
           } else {
-            it('does not trigger calculateLastBuyPrice', () => {
-              expect(mockCalculateLastBuyPrice).not.toHaveBeenCalled();
-            });
-
-            it('does not trigger cache.hdel', () => {
-              expect(cacheMock.hdel).not.toHaveBeenCalled();
+            it('does not trigger deleteManualOrder', () => {
+              expect(mockDeleteManualOrder).not.toHaveBeenCalled();
             });
 
             it('does not trigger getSymbolGridTrade', () => {
@@ -505,14 +684,10 @@ describe('ensure-manual-order.js', () => {
             it('does not trigger saveSymbolGridTrade', () => {
               expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
             });
-
-            it('does not trigger saveOrder', () => {
-              expect(mockSaveOrder).not.toHaveBeenCalled();
-            });
           }
 
-          it('does not trigger cache.hset', () => {
-            expect(cacheMock.hset).not.toHaveBeenCalled();
+          it('does not trigger saveManualOrder', () => {
+            expect(mockSaveManualOrder).not.toHaveBeenCalled();
           });
         });
       });
@@ -522,21 +697,23 @@ describe('ensure-manual-order.js', () => {
           desc: 'with LIMIT order and CANCELED',
           symbol: 'CAKEUSDT',
           orderId: 159653829,
-          cacheResults: {
-            159653829: JSON.stringify({
-              symbol: 'CAKEUSDT',
-              orderId: 159653829,
-              origQty: '1.00000000',
-              executedQty: '1.00000000',
-              cummulativeQuoteQty: '19.54900000',
-              status: 'NEW',
-              type: 'LIMIT',
-              side: 'BUY',
-              nextCheck: moment()
-                .subtract(1, 'minute')
-                .format('YYYY-MM-DDTHH:mm:ssZ')
-            })
-          },
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 159653829,
+                origQty: '1.00000000',
+                executedQty: '1.00000000',
+                cummulativeQuoteQty: '19.54900000',
+                status: 'NEW',
+                type: 'LIMIT',
+                side: 'BUY',
+                nextCheck: moment()
+                  .subtract(1, 'minute')
+                  .format('YYYY-MM-DDTHH:mm:ssZ')
+              }
+            }
+          ],
           getOrderResult: {
             symbol: 'CAKEUSDT',
             orderId: 159653829,
@@ -551,21 +728,23 @@ describe('ensure-manual-order.js', () => {
           desc: 'with LIMIT order and REJECTED',
           symbol: 'CAKEUSDT',
           orderId: 159653829,
-          cacheResults: {
-            159653829: JSON.stringify({
-              symbol: 'CAKEUSDT',
-              orderId: 159653829,
-              origQty: '1.00000000',
-              executedQty: '1.00000000',
-              cummulativeQuoteQty: '19.54900000',
-              status: 'NEW',
-              type: 'LIMIT',
-              side: 'BUY',
-              nextCheck: moment()
-                .subtract(1, 'minute')
-                .format('YYYY-MM-DDTHH:mm:ssZ')
-            })
-          },
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 159653829,
+                origQty: '1.00000000',
+                executedQty: '1.00000000',
+                cummulativeQuoteQty: '19.54900000',
+                status: 'NEW',
+                type: 'LIMIT',
+                side: 'BUY',
+                nextCheck: moment()
+                  .subtract(1, 'minute')
+                  .format('YYYY-MM-DDTHH:mm:ssZ')
+              }
+            }
+          ],
           getOrderResult: {
             symbol: 'CAKEUSDT',
             orderId: 159653829,
@@ -580,21 +759,23 @@ describe('ensure-manual-order.js', () => {
           desc: 'with LIMIT order and EXPIRED',
           symbol: 'CAKEUSDT',
           orderId: 159653829,
-          cacheResults: {
-            159653829: JSON.stringify({
-              symbol: 'CAKEUSDT',
-              orderId: 159653829,
-              origQty: '1.00000000',
-              executedQty: '1.00000000',
-              cummulativeQuoteQty: '19.54900000',
-              status: 'NEW',
-              type: 'LIMIT',
-              side: 'BUY',
-              nextCheck: moment()
-                .subtract(1, 'minute')
-                .format('YYYY-MM-DDTHH:mm:ssZ')
-            })
-          },
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 159653829,
+                origQty: '1.00000000',
+                executedQty: '1.00000000',
+                cummulativeQuoteQty: '19.54900000',
+                status: 'NEW',
+                type: 'LIMIT',
+                side: 'BUY',
+                nextCheck: moment()
+                  .subtract(1, 'minute')
+                  .format('YYYY-MM-DDTHH:mm:ssZ')
+              }
+            }
+          ],
           getOrderResult: {
             symbol: 'CAKEUSDT',
             orderId: 159653829,
@@ -609,21 +790,23 @@ describe('ensure-manual-order.js', () => {
           desc: 'with LIMIT order and PENDING_CANCEL',
           symbol: 'CAKEUSDT',
           orderId: 159653829,
-          cacheResults: {
-            159653829: JSON.stringify({
-              symbol: 'CAKEUSDT',
-              orderId: 159653829,
-              origQty: '1.00000000',
-              executedQty: '1.00000000',
-              cummulativeQuoteQty: '19.54900000',
-              status: 'NEW',
-              type: 'LIMIT',
-              side: 'BUY',
-              nextCheck: moment()
-                .subtract(1, 'minute')
-                .format('YYYY-MM-DDTHH:mm:ssZ')
-            })
-          },
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 159653829,
+                origQty: '1.00000000',
+                executedQty: '1.00000000',
+                cummulativeQuoteQty: '19.54900000',
+                status: 'NEW',
+                type: 'LIMIT',
+                side: 'BUY',
+                nextCheck: moment()
+                  .subtract(1, 'minute')
+                  .format('YYYY-MM-DDTHH:mm:ssZ')
+              }
+            }
+          ],
           getOrderResult: {
             symbol: 'CAKEUSDT',
             orderId: 159653829,
@@ -638,21 +821,23 @@ describe('ensure-manual-order.js', () => {
           desc: 'with LIMIT order and CANCELED',
           symbol: 'CAKEUSDT',
           orderId: 159653829,
-          cacheResults: {
-            159653829: JSON.stringify({
-              symbol: 'CAKEUSDT',
-              orderId: 159653829,
-              origQty: '1.00000000',
-              executedQty: '1.00000000',
-              cummulativeQuoteQty: '19.54900000',
-              status: 'NEW',
-              type: 'LIMIT',
-              side: 'BUY',
-              nextCheck: moment()
-                .subtract(1, 'minute')
-                .format('YYYY-MM-DDTHH:mm:ssZ')
-            })
-          },
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 159653829,
+                origQty: '1.00000000',
+                executedQty: '1.00000000',
+                cummulativeQuoteQty: '19.54900000',
+                status: 'NEW',
+                type: 'LIMIT',
+                side: 'BUY',
+                nextCheck: moment()
+                  .subtract(1, 'minute')
+                  .format('YYYY-MM-DDTHH:mm:ssZ')
+              }
+            }
+          ],
           getOrderResult: {
             symbol: 'CAKEUSDT',
             orderId: 159653829,
@@ -666,9 +851,15 @@ describe('ensure-manual-order.js', () => {
       ].forEach(testData => {
         describe(`${testData.desc}`, () => {
           beforeEach(async () => {
-            cacheMock.hgetall = jest
+            mockGetManualOrders = jest
               .fn()
               .mockResolvedValue(testData.cacheResults);
+
+            jest.mock('../../../trailingTradeHelper/order', () => ({
+              getManualOrders: mockGetManualOrders,
+              deleteManualOrder: mockDeleteManualOrder,
+              saveManualOrder: mockSaveManualOrder
+            }));
 
             binanceMock.client.getOrder = jest
               .fn()
@@ -694,9 +885,10 @@ describe('ensure-manual-order.js', () => {
             expect(mockCalculateLastBuyPrice).not.toHaveBeenCalled();
           });
 
-          it('triggers cache.hdel', () => {
-            expect(cacheMock.hdel).toHaveBeenCalledWith(
-              `trailing-trade-manual-order-${testData.symbol}`,
+          it('triggers deleteManualOrderhdel', () => {
+            expect(mockDeleteManualOrder).toHaveBeenCalledWith(
+              loggerMock,
+              testData.symbol,
               testData.orderId
             );
           });
@@ -709,19 +901,8 @@ describe('ensure-manual-order.js', () => {
             expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
           });
 
-          it('triggers saveOrder', () => {
-            expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-              order: {
-                ...JSON.parse(testData.cacheResults[testData.orderId]),
-                ...testData.getOrderResult
-              },
-              botStatus: {
-                savedAt: expect.any(String),
-                savedBy: 'ensure-manual-order',
-                savedMessage:
-                  'The order is no longer valid. Removed from the cache.'
-              }
-            });
+          it('does not trigger saveManualOrder', () => {
+            expect(mockSaveManualOrder).not.toHaveBeenCalled();
           });
         });
       });
@@ -731,21 +912,23 @@ describe('ensure-manual-order.js', () => {
           desc: 'with LIMIT order and still NEW',
           symbol: 'CAKEUSDT',
           orderId: 159653829,
-          cacheResults: {
-            159653829: JSON.stringify({
-              symbol: 'CAKEUSDT',
-              orderId: 159653829,
-              origQty: '1.00000000',
-              executedQty: '1.00000000',
-              cummulativeQuoteQty: '19.54900000',
-              status: 'NEW',
-              type: 'LIMIT',
-              side: 'BUY',
-              nextCheck: moment()
-                .subtract(1, 'minute')
-                .format('YYYY-MM-DDTHH:mm:ssZ')
-            })
-          },
+          cacheResults: [
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 159653829,
+                origQty: '1.00000000',
+                executedQty: '1.00000000',
+                cummulativeQuoteQty: '19.54900000',
+                status: 'NEW',
+                type: 'LIMIT',
+                side: 'BUY',
+                nextCheck: moment()
+                  .subtract(1, 'minute')
+                  .format('YYYY-MM-DDTHH:mm:ssZ')
+              }
+            }
+          ],
           getOrderResult: {
             symbol: 'CAKEUSDT',
             orderId: 159653829,
@@ -759,9 +942,15 @@ describe('ensure-manual-order.js', () => {
       ].forEach(testData => {
         describe(`${testData.desc}`, () => {
           beforeEach(async () => {
-            cacheMock.hgetall = jest
+            mockGetManualOrders = jest
               .fn()
               .mockResolvedValue(testData.cacheResults);
+
+            jest.mock('../../../trailingTradeHelper/order', () => ({
+              getManualOrders: mockGetManualOrders,
+              deleteManualOrder: mockDeleteManualOrder,
+              saveManualOrder: mockSaveManualOrder
+            }));
 
             binanceMock.client.getOrder = jest
               .fn()
@@ -787,15 +976,19 @@ describe('ensure-manual-order.js', () => {
             expect(mockCalculateLastBuyPrice).not.toHaveBeenCalled();
           });
 
-          it('does not trigger cache.hdel', () => {
-            expect(cacheMock.hdel).not.toHaveBeenCalled();
+          it('does not trigger deleteManualOrder', () => {
+            expect(mockDeleteManualOrder).not.toHaveBeenCalled();
           });
 
-          it('triggers cache.hset', () => {
-            expect(cacheMock.hset).toHaveBeenCalledWith(
-              `trailing-trade-manual-order-${testData.symbol}`,
+          it('triggers saveManualOrder', () => {
+            expect(mockSaveManualOrder).toHaveBeenCalledWith(
+              loggerMock,
+              testData.symbol,
               testData.orderId,
-              expect.any(String)
+              {
+                ...testData.getOrderResult,
+                nextCheck: expect.any(String)
+              }
             );
           });
 
@@ -806,39 +999,34 @@ describe('ensure-manual-order.js', () => {
           it('does not trigger saveSymbolGridTrade', () => {
             expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
           });
-
-          it('triggers saveOrder', () => {
-            expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-              order: {
-                ...testData.getOrderResult
-              },
-              botStatus: {
-                savedAt: expect.any(String),
-                savedBy: 'ensure-manual-order',
-                savedMessage: 'The order is not filled. Check next internal.'
-              }
-            });
-          });
         });
       });
 
       describe('when binance.client.getOrder throws an error', () => {
         beforeEach(async () => {
-          cacheMock.hgetall = jest.fn().mockResolvedValue({
-            159653829: JSON.stringify({
-              symbol: 'CAKEUSDT',
-              orderId: 159653829,
-              origQty: '1.00000000',
-              executedQty: '1.00000000',
-              cummulativeQuoteQty: '19.54900000',
-              status: 'NEW',
-              type: 'LIMIT',
-              side: 'BUY',
-              nextCheck: moment()
-                .subtract(1, 'minute')
-                .format('YYYY-MM-DDTHH:mm:ssZ')
-            })
-          });
+          mockGetManualOrders = jest.fn().mockResolvedValue([
+            {
+              order: {
+                symbol: 'CAKEUSDT',
+                orderId: 159653829,
+                origQty: '1.00000000',
+                executedQty: '1.00000000',
+                cummulativeQuoteQty: '19.54900000',
+                status: 'NEW',
+                type: 'LIMIT',
+                side: 'BUY',
+                nextCheck: moment()
+                  .subtract(1, 'minute')
+                  .format('YYYY-MM-DDTHH:mm:ssZ')
+              }
+            }
+          ]);
+
+          jest.mock('../../../trailingTradeHelper/order', () => ({
+            getManualOrders: mockGetManualOrders,
+            deleteManualOrder: mockDeleteManualOrder,
+            saveManualOrder: mockSaveManualOrder
+          }));
 
           binanceMock.client.getOrder = jest
             .fn()
@@ -864,8 +1052,8 @@ describe('ensure-manual-order.js', () => {
           expect(mockCalculateLastBuyPrice).not.toHaveBeenCalled();
         });
 
-        it('does not trigger cache.hdel', () => {
-          expect(cacheMock.hdel).not.toHaveBeenCalled();
+        it('does not trigger deleteManualOrder', () => {
+          expect(mockDeleteManualOrder).not.toHaveBeenCalled();
         });
 
         it('does not trigger getSymbolGridTrade', () => {
@@ -876,17 +1064,12 @@ describe('ensure-manual-order.js', () => {
           expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
         });
 
-        it('triggers cache.hset', () => {
-          expect(cacheMock.hset).toHaveBeenCalledWith(
-            `trailing-trade-manual-order-CAKEUSDT`,
+        it('triggers saveManualOrder', () => {
+          expect(mockSaveManualOrder).toHaveBeenCalledWith(
+            loggerMock,
+            'CAKEUSDT',
             159653829,
-            expect.any(String)
-          );
-        });
-
-        it('triggers saveOrder', () => {
-          expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-            order: {
+            {
               symbol: 'CAKEUSDT',
               orderId: 159653829,
               origQty: '1.00000000',
@@ -896,14 +1079,8 @@ describe('ensure-manual-order.js', () => {
               type: 'LIMIT',
               side: 'BUY',
               nextCheck: expect.any(String)
-            },
-            botStatus: {
-              savedAt: expect.any(String),
-              savedBy: 'ensure-manual-order',
-              savedMessage:
-                'The order could not be found or error occurred querying the order.'
             }
-          });
+          );
         });
       });
     });

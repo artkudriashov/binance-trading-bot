@@ -4,12 +4,10 @@ const { version } = require('../../../../package.json');
 
 const { binance, cache } = require('../../../helpers');
 const {
-  getGlobalConfiguration,
   getConfiguration
 } = require('../../../cronjob/trailingTradeHelper/configuration');
 
 const {
-  getLastBuyPrice,
   isActionDisabled
 } = require('../../../cronjob/trailingTradeHelper/common');
 
@@ -24,7 +22,7 @@ const getSymbolFromKey = key => {
 };
 
 const handleLatest = async (logger, ws, payload) => {
-  const globalConfiguration = await getGlobalConfiguration(logger);
+  const globalConfiguration = await getConfiguration(logger);
   logger.info({ globalConfiguration }, 'Configuration from MongoDB');
 
   // If not authenticated and lock list is enabled, then do not send any information.
@@ -49,12 +47,21 @@ const handleLatest = async (logger, ws, payload) => {
     return;
   }
 
-  const cacheTrailingTradeCommon = await cache.hgetall('trailing-trade-common');
-  const cacheTrailingTradeSymbols = await cache.hgetall(
-    'trailing-trade-symbols'
+  const cacheTrailingTradeCommon = await cache.hgetall(
+    'trailing-trade-common:',
+    'trailing-trade-common:*'
   );
+
+  const cacheTrailingTradeSymbols = await cache.hgetall(
+    'trailing-trade-symbols:',
+    'trailing-trade-symbols:*-processed-data'
+  );
+
   const cacheTrailingTradeClosedTrades = _.map(
-    await cache.hgetall('trailing-trade-closed-trades'),
+    await cache.hgetall(
+      'trailing-trade-closed-trades:',
+      'trailing-trade-closed-trades:*'
+    ),
     stats => JSON.parse(stats)
   );
 
@@ -69,23 +76,31 @@ const handleLatest = async (logger, ws, payload) => {
       gitHash: process.env.GIT_HASH || 'unspecified',
       accountInfo: JSON.parse(cacheTrailingTradeCommon['account-info']),
       exchangeSymbols: JSON.parse(cacheTrailingTradeCommon['exchange-symbols']),
-      publicURL: cacheTrailingTradeCommon['local-tunnel-url'],
       apiInfo: binance.client.getInfo(),
       closedTradesSetting: JSON.parse(
         cacheTrailingTradeCommon['closed-trades']
       ),
-      closedTrades: cacheTrailingTradeClosedTrades
+      closedTrades: cacheTrailingTradeClosedTrades,
+      orderStats: {
+        numberOfOpenTrades: parseInt(
+          cacheTrailingTradeCommon['number-of-open-trades'],
+          10
+        ),
+        numberOfBuyOpenOrders: parseInt(
+          cacheTrailingTradeCommon['number-of-buy-open-orders'],
+          10
+        )
+      }
     };
   } catch (e) {
     logger.error({ e }, 'Something wrong with trailing-trade-common cache');
-
     return;
   }
 
   _.forIn(cacheTrailingTradeSymbols, (value, key) => {
     const { symbol, newKey } = getSymbolFromKey(key);
 
-    if (newKey === 'data') {
+    if (newKey === 'processed-data') {
       stats.symbols[symbol] = JSON.parse(value);
     }
   });
@@ -93,16 +108,6 @@ const handleLatest = async (logger, ws, payload) => {
   stats.symbols = await Promise.all(
     _.map(stats.symbols, async symbol => {
       const newSymbol = symbol;
-      // Retrieve latest symbol configuration
-      newSymbol.symbolConfiguration = await getConfiguration(
-        logger,
-        newSymbol.symbol
-      );
-
-      // Retrieve latest last buy price
-      const lastBuyPriceDoc = await getLastBuyPrice(logger, newSymbol.symbol);
-      const lastBuyPrice = _.get(lastBuyPriceDoc, 'lastBuyPrice', null);
-      newSymbol.sell.lastBuyPrice = lastBuyPrice;
 
       // Retreive action disabled
       newSymbol.isActionDisabled = await isActionDisabled(newSymbol.symbol);

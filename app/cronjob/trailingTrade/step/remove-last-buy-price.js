@@ -1,35 +1,38 @@
 const _ = require('lodash');
 const moment = require('moment');
-const { mongo, cache, slack, PubSub } = require('../../../helpers');
+const { slack, PubSub } = require('../../../helpers');
 const {
   getAndCacheOpenOrdersForSymbol,
   getAPILimit,
-  isActionDisabled
+  isActionDisabled,
+  removeLastBuyPrice: removeLastBuyPriceFromDatabase,
+  saveOrderStats,
+  saveOverrideAction
 } = require('../../trailingTradeHelper/common');
-
 const {
   archiveSymbolGridTrade,
   deleteSymbolGridTrade
 } = require('../../trailingTradeHelper/configuration');
+const { getGridTradeOrder } = require('../../trailingTradeHelper/order');
 
 /**
- * Retrieve last buy order from cache
+ * Set message and return data
  *
  * @param {*} logger
- * @param {*} symbol
+ * @param {*} rawData
+ * @param {*} processMessage
  * @returns
  */
+const setMessage = (logger, rawData, processMessage) => {
+  const data = rawData;
 
-const getLastBuyOrder = async (logger, symbol) => {
-  const cachedLastBuyOrder =
-    JSON.parse(await cache.get(`${symbol}-last-buy-order`)) || {};
-
-  logger.info({ cachedLastBuyOrder }, 'Retrieved last buy order from cache');
-
-  return cachedLastBuyOrder;
+  logger.info({ data, saveLog: true }, processMessage);
+  data.sell.processMessage = processMessage;
+  data.sell.updatedAt = moment().utc();
+  return data;
 };
 
-/**
+/*
  * Retrieve last grid order from cache
  *
  * @param {*} logger
@@ -38,16 +41,18 @@ const getLastBuyOrder = async (logger, symbol) => {
  * @returns
  */
 const getGridTradeLastOrder = async (logger, symbol, side) => {
-  const cachedLastOrder =
-    JSON.parse(await cache.get(`${symbol}-grid-trade-last-${side}-order`)) ||
-    {};
+  const lastOrder =
+    (await getGridTradeOrder(
+      logger,
+      `${symbol}-grid-trade-last-${side}-order`
+    )) || {};
 
   logger.info(
-    { cachedLastOrder },
+    { lastOrder },
     `Retrieved grid trade last ${side} order from cache`
   );
 
-  return cachedLastOrder;
+  return lastOrder;
 };
 
 /**
@@ -68,6 +73,7 @@ const removeLastBuyPrice = async (
 ) => {
   const {
     symbolConfiguration: {
+      symbols,
       botOptions: {
         autoTriggerBuy: {
           enabled: autoTriggerBuyEnabled,
@@ -78,9 +84,10 @@ const removeLastBuyPrice = async (
   } = data;
 
   // Delete the last buy price from the database
-  await mongo.deleteOne(logger, 'trailing-trade-symbols', {
-    key: `${symbol}-last-buy-price`
-  });
+  await removeLastBuyPriceFromDatabase(logger, symbol);
+
+  // Save number of active orders
+  await saveOrderStats(logger, symbols);
 
   slack.sendMessage(
     `${symbol} Action (${moment().format(
@@ -122,30 +129,19 @@ const removeLastBuyPrice = async (
   await deleteSymbolGridTrade(logger, symbol);
 
   if (autoTriggerBuyEnabled) {
-    await cache.hset(
-      'trailing-trade-override',
-      `${symbol}`,
-      JSON.stringify({
+    await saveOverrideAction(
+      logger,
+      symbol,
+      {
         action: 'buy',
-        actionAt: moment().add(autoTriggerBuyTriggerAfter, 'minutes')
-      })
-    );
-
-    slack.sendMessage(
-      `${symbol} Action (${moment().format(
-        'HH:mm:ss.SSS'
-      )}): Queued buy action\n` +
-        `- Message: The bot queued to trigger the grid trade for buying` +
-        ` after ${autoTriggerBuyTriggerAfter} minutes later.\n` +
-        `- Current API Usage: ${getAPILimit(logger)}`
-    );
-
-    PubSub.publish('frontend-notification', {
-      type: 'info',
-      title:
-        `The bot queued to trigger the grid trade for buying` +
+        actionAt: moment().add(autoTriggerBuyTriggerAfter, 'minutes').format(),
+        triggeredBy: 'auto-trigger',
+        notify: true,
+        checkTradingView: true
+      },
+      `The bot queued the action to trigger the grid trade for buying` +
         ` after ${autoTriggerBuyTriggerAfter} minutes later.`
-    });
+    );
   }
 };
 
@@ -187,14 +183,6 @@ const execute = async (logger, rawData) => {
 
   if (action !== 'not-determined') {
     logger.info('Do not process to remove last buy price.');
-    return data;
-  }
-
-  const lastBuyOrder = await getLastBuyOrder(logger, symbol);
-  if (_.isEmpty(lastBuyOrder) === false) {
-    logger.info(
-      'Do not process to remove last buy price because there is a buy order to be confirmed.'
-    );
     return data;
   }
 
@@ -275,9 +263,6 @@ const execute = async (logger, rawData) => {
       processMessage
     );
 
-    data.sell.processMessage = processMessage;
-    data.sell.updatedAt = moment().utc();
-
     await removeLastBuyPrice(logger, symbol, data, processMessage, {
       lastBuyPrice,
       baseAssetQuantity,
@@ -288,7 +273,7 @@ const execute = async (logger, rawData) => {
       openOrders
     });
 
-    return data;
+    return setMessage(logger, data, processMessage);
   }
 
   if (baseAssetQuantity * currentPrice < lastBuyPriceRemoveThreshold) {
@@ -304,9 +289,6 @@ const execute = async (logger, rawData) => {
 
     logger.error({ baseAssetQuantity }, processMessage);
 
-    data.sell.processMessage = processMessage;
-    data.sell.updatedAt = moment().utc();
-
     await removeLastBuyPrice(logger, symbol, data, processMessage, {
       lastBuyPrice,
       baseAssetQuantity,
@@ -315,7 +297,7 @@ const execute = async (logger, rawData) => {
       openOrders
     });
 
-    return data;
+    return setMessage(logger, data, processMessage);
   }
 
   return data;

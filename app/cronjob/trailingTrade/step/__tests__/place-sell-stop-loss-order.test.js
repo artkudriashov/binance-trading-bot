@@ -13,7 +13,6 @@ describe('place-sell-stop-loss-order.js', () => {
   let mockIsExceedAPILimit;
   let mockDisableAction;
   let mockGetAPILimit;
-  let mockSaveOrder;
 
   let mockSaveSymbolGridTrade;
 
@@ -34,7 +33,6 @@ describe('place-sell-stop-loss-order.js', () => {
       mockIsExceedAPILimit = jest.fn().mockReturnValue(false);
       mockDisableAction = jest.fn().mockResolvedValue(true);
       mockGetAPILimit = jest.fn().mockReturnValueOnce(10);
-      mockSaveOrder = jest.fn().mockResolvedValue(true);
 
       mockSaveSymbolGridTrade = jest.fn().mockResolvedValue(true);
     });
@@ -51,8 +49,7 @@ describe('place-sell-stop-loss-order.js', () => {
           getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
           isExceedAPILimit: mockIsExceedAPILimit,
           disableAction: mockDisableAction,
-          getAPILimit: mockGetAPILimit,
-          saveOrder: mockSaveOrder
+          getAPILimit: mockGetAPILimit
         }));
 
         jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -86,7 +83,8 @@ describe('place-sell-stop-loss-order.js', () => {
           },
           action: 'not-determined',
           baseAssetBalance: { free: 0.5 },
-          sell: { currentPrice: 200, openOrders: [] }
+          sell: { currentPrice: 200, openOrders: [] },
+          canDisable: true
         };
 
         result = await step.execute(loggerMock, rawData);
@@ -108,10 +106,6 @@ describe('place-sell-stop-loss-order.js', () => {
         expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
       });
 
-      it('does not trigger saveOrder', () => {
-        expect(mockSaveOrder).not.toHaveBeenCalled();
-      });
-
       it('retruns expected value', () => {
         expect(result).toStrictEqual(rawData);
       });
@@ -129,8 +123,7 @@ describe('place-sell-stop-loss-order.js', () => {
           getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
           isExceedAPILimit: mockIsExceedAPILimit,
           disableAction: mockDisableAction,
-          getAPILimit: mockGetAPILimit,
-          saveOrder: mockSaveOrder
+          getAPILimit: mockGetAPILimit
         }));
 
         jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -164,7 +157,8 @@ describe('place-sell-stop-loss-order.js', () => {
           },
           action: 'not-determined',
           baseAssetBalance: { free: 0.5 },
-          sell: { currentPrice: 200, openOrders: [] }
+          sell: { currentPrice: 200, openOrders: [] },
+          canDisable: true
         };
 
         result = await step.execute(loggerMock, rawData);
@@ -186,10 +180,6 @@ describe('place-sell-stop-loss-order.js', () => {
         expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
       });
 
-      it('does not trigger saveOrder', () => {
-        expect(mockSaveOrder).not.toHaveBeenCalled();
-      });
-
       it('retruns expected value', () => {
         expect(result).toStrictEqual(rawData);
       });
@@ -207,8 +197,7 @@ describe('place-sell-stop-loss-order.js', () => {
           getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
           isExceedAPILimit: mockIsExceedAPILimit,
           disableAction: mockDisableAction,
-          getAPILimit: mockGetAPILimit,
-          saveOrder: mockSaveOrder
+          getAPILimit: mockGetAPILimit
         }));
 
         jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -254,7 +243,8 @@ describe('place-sell-stop-loss-order.js', () => {
                 stopPrice: '198.000000'
               }
             ]
-          }
+          },
+          canDisable: true
         };
 
         result = await step.execute(loggerMock, rawData);
@@ -274,10 +264,6 @@ describe('place-sell-stop-loss-order.js', () => {
 
       it('does not trigger saveSymbolGridTrade', () => {
         expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
-      });
-
-      it('does not trigger saveOrder', () => {
-        expect(mockSaveOrder).not.toHaveBeenCalled();
       });
 
       it('retruns expected value', () => {
@@ -318,8 +304,7 @@ describe('place-sell-stop-loss-order.js', () => {
             getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
             isExceedAPILimit: mockIsExceedAPILimit,
             disableAction: mockDisableAction,
-            getAPILimit: mockGetAPILimit,
-            saveOrder: mockSaveOrder
+            getAPILimit: mockGetAPILimit
           }));
 
           jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -356,7 +341,8 @@ describe('place-sell-stop-loss-order.js', () => {
             sell: {
               currentPrice: 200,
               openOrders: []
-            }
+            },
+            canDisable: true
           };
 
           result = await step.execute(loggerMock, rawData);
@@ -376,10 +362,6 @@ describe('place-sell-stop-loss-order.js', () => {
 
         it('does not trigger saveSymbolGridTrade', () => {
           expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
-        });
-
-        it('does not trigger saveOrder', () => {
-          expect(mockSaveOrder).not.toHaveBeenCalled();
         });
 
         it('retruns expected value', () => {
@@ -411,8 +393,7 @@ describe('place-sell-stop-loss-order.js', () => {
             getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
             isExceedAPILimit: mockIsExceedAPILimit,
             disableAction: mockDisableAction,
-            getAPILimit: mockGetAPILimit,
-            saveOrder: mockSaveOrder
+            getAPILimit: mockGetAPILimit
           }));
 
           jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -449,7 +430,8 @@ describe('place-sell-stop-loss-order.js', () => {
             sell: {
               currentPrice: 200,
               openOrders: []
-            }
+            },
+            canDisable: true
           };
 
           result = await step.execute(loggerMock, rawData);
@@ -469,10 +451,6 @@ describe('place-sell-stop-loss-order.js', () => {
 
         it('does not trigger saveSymbolGridTrade', () => {
           expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
-        });
-
-        it('does not trigger saveOrder', () => {
-          expect(mockSaveOrder).not.toHaveBeenCalled();
         });
 
         it('retruns expected value', () => {
@@ -504,8 +482,7 @@ describe('place-sell-stop-loss-order.js', () => {
             getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
             isExceedAPILimit: mockIsExceedAPILimit,
             disableAction: mockDisableAction,
-            getAPILimit: mockGetAPILimit,
-            saveOrder: mockSaveOrder
+            getAPILimit: mockGetAPILimit
           }));
 
           jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -542,7 +519,8 @@ describe('place-sell-stop-loss-order.js', () => {
             sell: {
               currentPrice: 268748,
               openOrders: []
-            }
+            },
+            canDisable: true
           };
 
           result = await step.execute(loggerMock, rawData);
@@ -562,10 +540,6 @@ describe('place-sell-stop-loss-order.js', () => {
 
         it('does not trigger saveSymbolGridTrade', () => {
           expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
-        });
-
-        it('does not trigger saveOrder', () => {
-          expect(mockSaveOrder).not.toHaveBeenCalled();
         });
 
         it('retruns expected value', () => {
@@ -599,8 +573,7 @@ describe('place-sell-stop-loss-order.js', () => {
             getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
             isExceedAPILimit: mockIsExceedAPILimit,
             disableAction: mockDisableAction,
-            getAPILimit: mockGetAPILimit,
-            saveOrder: mockSaveOrder
+            getAPILimit: mockGetAPILimit
           }));
 
           jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -637,7 +610,8 @@ describe('place-sell-stop-loss-order.js', () => {
             sell: {
               currentPrice: 200,
               openOrders: []
-            }
+            },
+            canDisable: true
           };
 
           result = await step.execute(loggerMock, rawData);
@@ -657,10 +631,6 @@ describe('place-sell-stop-loss-order.js', () => {
 
         it('does not trigger saveSymbolGridTrade', () => {
           expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
-        });
-
-        it('does not trigger saveOrder', () => {
-          expect(mockSaveOrder).not.toHaveBeenCalled();
         });
 
         it('retruns expected value', () => {
@@ -691,8 +661,7 @@ describe('place-sell-stop-loss-order.js', () => {
             getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
             isExceedAPILimit: mockIsExceedAPILimit,
             disableAction: mockDisableAction,
-            getAPILimit: mockGetAPILimit,
-            saveOrder: mockSaveOrder
+            getAPILimit: mockGetAPILimit
           }));
 
           jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -729,7 +698,8 @@ describe('place-sell-stop-loss-order.js', () => {
             sell: {
               currentPrice: 0.00003771,
               openOrders: []
-            }
+            },
+            canDisable: true
           };
 
           result = await step.execute(loggerMock, rawData);
@@ -749,10 +719,6 @@ describe('place-sell-stop-loss-order.js', () => {
 
         it('does not trigger saveSymbolGridTrade', () => {
           expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
-        });
-
-        it('does not trigger saveOrder', () => {
-          expect(mockSaveOrder).not.toHaveBeenCalled();
         });
 
         it('retruns expected value', () => {
@@ -783,8 +749,7 @@ describe('place-sell-stop-loss-order.js', () => {
             getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
             isExceedAPILimit: mockIsExceedAPILimit,
             disableAction: mockDisableAction,
-            getAPILimit: mockGetAPILimit,
-            saveOrder: mockSaveOrder
+            getAPILimit: mockGetAPILimit
           }));
 
           jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -821,7 +786,8 @@ describe('place-sell-stop-loss-order.js', () => {
             sell: {
               currentPrice: 268748,
               openOrders: []
-            }
+            },
+            canDisable: true
           };
 
           result = await step.execute(loggerMock, rawData);
@@ -841,10 +807,6 @@ describe('place-sell-stop-loss-order.js', () => {
 
         it('does not trigger saveSymbolGridTrade', () => {
           expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
-        });
-
-        it('does not trigger saveOrder', () => {
-          expect(mockSaveOrder).not.toHaveBeenCalled();
         });
 
         it('retruns expected value', () => {
@@ -876,8 +838,7 @@ describe('place-sell-stop-loss-order.js', () => {
           getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
           isExceedAPILimit: mockIsExceedAPILimit,
           disableAction: mockDisableAction,
-          getAPILimit: mockGetAPILimit,
-          saveOrder: mockSaveOrder
+          getAPILimit: mockGetAPILimit
         }));
 
         jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -914,7 +875,8 @@ describe('place-sell-stop-loss-order.js', () => {
           sell: {
             currentPrice: 200,
             openOrders: []
-          }
+          },
+          canDisable: true
         };
 
         result = await step.execute(loggerMock, rawData);
@@ -934,10 +896,6 @@ describe('place-sell-stop-loss-order.js', () => {
 
       it('does not trigger saveSymbolGridTrade', () => {
         expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
-      });
-
-      it('does not trigger saveOrder', () => {
-        expect(mockSaveOrder).not.toHaveBeenCalled();
       });
 
       it('retruns expected value', () => {
@@ -970,8 +928,7 @@ describe('place-sell-stop-loss-order.js', () => {
           getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
           isExceedAPILimit: mockIsExceedAPILimit,
           disableAction: mockDisableAction,
-          getAPILimit: mockGetAPILimit,
-          saveOrder: mockSaveOrder
+          getAPILimit: mockGetAPILimit
         }));
 
         jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -1008,7 +965,8 @@ describe('place-sell-stop-loss-order.js', () => {
           sell: {
             currentPrice: 200,
             openOrders: []
-          }
+          },
+          canDisable: true
         };
 
         result = await step.execute(loggerMock, rawData);
@@ -1028,10 +986,6 @@ describe('place-sell-stop-loss-order.js', () => {
 
       it('does not trigger saveSymbolGridTrade', () => {
         expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
-      });
-
-      it('does not trigger saveOrder', () => {
-        expect(mockSaveOrder).not.toHaveBeenCalled();
       });
 
       it('retruns expected value', () => {
@@ -1062,8 +1016,7 @@ describe('place-sell-stop-loss-order.js', () => {
           getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
           isExceedAPILimit: mockIsExceedAPILimit,
           disableAction: mockDisableAction,
-          getAPILimit: mockGetAPILimit,
-          saveOrder: mockSaveOrder
+          getAPILimit: mockGetAPILimit
         }));
 
         jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -1100,7 +1053,8 @@ describe('place-sell-stop-loss-order.js', () => {
           sell: {
             currentPrice: 200,
             openOrders: []
-          }
+          },
+          canDisable: true
         };
 
         result = await step.execute(loggerMock, rawData);
@@ -1120,10 +1074,6 @@ describe('place-sell-stop-loss-order.js', () => {
 
       it('does not trigger saveSymbolGridTrade', () => {
         expect(mockSaveSymbolGridTrade).not.toHaveBeenCalled();
-      });
-
-      it('does not trigger saveOrder', () => {
-        expect(mockSaveOrder).not.toHaveBeenCalled();
       });
 
       it('retruns expected value', () => {
@@ -1173,8 +1123,7 @@ describe('place-sell-stop-loss-order.js', () => {
               getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
               isExceedAPILimit: mockIsExceedAPILimit,
               disableAction: mockDisableAction,
-              getAPILimit: mockGetAPILimit,
-              saveOrder: mockSaveOrder
+              getAPILimit: mockGetAPILimit
             }));
 
             jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -1230,7 +1179,8 @@ describe('place-sell-stop-loss-order.js', () => {
               sell: {
                 currentPrice: 200,
                 openOrders: []
-              }
+              },
+              canDisable: true
             };
 
             result = await step.execute(loggerMock, rawData);
@@ -1247,6 +1197,7 @@ describe('place-sell-stop-loss-order.js', () => {
 
           it('triggers disableAction', () => {
             expect(mockDisableAction).toHaveBeenCalledWith(
+              loggerMock,
               'BTCUPUSDT',
               {
                 disabledBy: 'stop loss',
@@ -1299,23 +1250,6 @@ describe('place-sell-stop-loss-order.js', () => {
                 }
               }
             );
-          });
-
-          it('triggers saveOrder', () => {
-            expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-              order: {
-                symbol: 'BTCUPUSDT',
-                orderId: 2701762317,
-                orderListId: -1,
-                clientOrderId: '6eGYHaJbmJrIS40eoq8ziM',
-                transactTime: 1626946722520
-              },
-              botStatus: {
-                savedAt: expect.any(String),
-                savedBy: 'place-sell-stop-loss-order',
-                savedMessage: 'The sell STOP-LOSS order is placed.'
-              }
-            });
           });
 
           it('retruns expected value', () => {
@@ -1379,8 +1313,7 @@ describe('place-sell-stop-loss-order.js', () => {
               getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
               isExceedAPILimit: mockIsExceedAPILimit,
               disableAction: mockDisableAction,
-              getAPILimit: mockGetAPILimit,
-              saveOrder: mockSaveOrder
+              getAPILimit: mockGetAPILimit
             }));
 
             jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -1443,7 +1376,8 @@ describe('place-sell-stop-loss-order.js', () => {
               sell: {
                 currentPrice: 0.00003771,
                 openOrders: []
-              }
+              },
+              canDisable: true
             };
 
             result = await step.execute(loggerMock, rawData);
@@ -1460,6 +1394,7 @@ describe('place-sell-stop-loss-order.js', () => {
 
           it('triggers disableAction', () => {
             expect(mockDisableAction).toHaveBeenCalledWith(
+              loggerMock,
               'ALPHABTC',
               {
                 disabledBy: 'stop loss',
@@ -1519,23 +1454,6 @@ describe('place-sell-stop-loss-order.js', () => {
                 }
               }
             );
-          });
-
-          it('triggers saveOrder', () => {
-            expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-              order: {
-                symbol: 'ALPHABTC',
-                orderId: 2701762317,
-                orderListId: -1,
-                clientOrderId: '6eGYHaJbmJrIS40eoq8ziM',
-                transactTime: 1626946722520
-              },
-              botStatus: {
-                savedAt: expect.any(String),
-                savedBy: 'place-sell-stop-loss-order',
-                savedMessage: 'The sell STOP-LOSS order is placed.'
-              }
-            });
           });
 
           it('retruns expected value', () => {
@@ -1599,8 +1517,7 @@ describe('place-sell-stop-loss-order.js', () => {
               getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
               isExceedAPILimit: mockIsExceedAPILimit,
               disableAction: mockDisableAction,
-              getAPILimit: mockGetAPILimit,
-              saveOrder: mockSaveOrder
+              getAPILimit: mockGetAPILimit
             }));
 
             jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -1663,7 +1580,8 @@ describe('place-sell-stop-loss-order.js', () => {
               sell: {
                 currentPrice: 268748,
                 openOrders: []
-              }
+              },
+              canDisable: true
             };
 
             result = await step.execute(loggerMock, rawData);
@@ -1680,6 +1598,7 @@ describe('place-sell-stop-loss-order.js', () => {
 
           it('triggers disableAction', () => {
             expect(mockDisableAction).toHaveBeenCalledWith(
+              loggerMock,
               'BTCBRL',
               {
                 disabledBy: 'stop loss',
@@ -1739,23 +1658,6 @@ describe('place-sell-stop-loss-order.js', () => {
                 }
               }
             );
-          });
-
-          it('triggers saveOrder', () => {
-            expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-              order: {
-                symbol: 'BTCBRL',
-                orderId: 2701762317,
-                orderListId: -1,
-                clientOrderId: '6eGYHaJbmJrIS40eoq8ziM',
-                transactTime: 1626946722520
-              },
-              botStatus: {
-                savedAt: expect.any(String),
-                savedBy: 'place-sell-stop-loss-order',
-                savedMessage: 'The sell STOP-LOSS order is placed.'
-              }
-            });
           });
 
           it('retruns expected value', () => {
@@ -1821,8 +1723,7 @@ describe('place-sell-stop-loss-order.js', () => {
               getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
               isExceedAPILimit: mockIsExceedAPILimit,
               disableAction: mockDisableAction,
-              getAPILimit: mockGetAPILimit,
-              saveOrder: mockSaveOrder
+              getAPILimit: mockGetAPILimit
             }));
 
             jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -1885,7 +1786,8 @@ describe('place-sell-stop-loss-order.js', () => {
               sell: {
                 currentPrice: 200,
                 openOrders: []
-              }
+              },
+              canDisable: false
             };
 
             result = await step.execute(loggerMock, rawData);
@@ -1900,17 +1802,8 @@ describe('place-sell-stop-loss-order.js', () => {
             });
           });
 
-          it('triggers disableAction', () => {
-            expect(mockDisableAction).toHaveBeenCalledWith(
-              'BTCUPUSDT',
-              {
-                disabledBy: 'stop loss',
-                message: 'Temporary disabled by stop loss',
-                canResume: true,
-                canRemoveLastBuyPrice: true
-              },
-              60 * 60
-            );
+          it('does not trigger disableAction', () => {
+            expect(mockDisableAction).not.toHaveBeenCalled();
           });
 
           it('triggers getAndCacheOpenOrdersForSymbol', () => {
@@ -1921,7 +1814,7 @@ describe('place-sell-stop-loss-order.js', () => {
             expect(mockGetAccountInfoFromAPI).toHaveBeenCalled();
           });
 
-          it('triggers saveSymbolGridTrade', () => {
+          it('does not trigger saveSymbolGridTrade', () => {
             expect(mockSaveSymbolGridTrade).toHaveBeenCalledWith(
               loggerMock,
               'BTCUPUSDT',
@@ -1961,23 +1854,6 @@ describe('place-sell-stop-loss-order.js', () => {
                 }
               }
             );
-          });
-
-          it('triggers saveOrder', () => {
-            expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-              order: {
-                symbol: 'BTCUPUSDT',
-                orderId: 2701762317,
-                orderListId: -1,
-                clientOrderId: '6eGYHaJbmJrIS40eoq8ziM',
-                transactTime: 1626946722520
-              },
-              botStatus: {
-                savedAt: expect.any(String),
-                savedBy: 'place-sell-stop-loss-order',
-                savedMessage: 'The sell STOP-LOSS order is placed.'
-              }
-            });
           });
 
           it('retruns expected value', () => {
@@ -2041,8 +1917,7 @@ describe('place-sell-stop-loss-order.js', () => {
               getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
               isExceedAPILimit: mockIsExceedAPILimit,
               disableAction: mockDisableAction,
-              getAPILimit: mockGetAPILimit,
-              saveOrder: mockSaveOrder
+              getAPILimit: mockGetAPILimit
             }));
 
             jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -2105,7 +1980,8 @@ describe('place-sell-stop-loss-order.js', () => {
               sell: {
                 currentPrice: 0.00003771,
                 openOrders: []
-              }
+              },
+              canDisable: false
             };
 
             result = await step.execute(loggerMock, rawData);
@@ -2120,17 +1996,8 @@ describe('place-sell-stop-loss-order.js', () => {
             });
           });
 
-          it('triggers disableAction', () => {
-            expect(mockDisableAction).toHaveBeenCalledWith(
-              'ALPHABTC',
-              {
-                disabledBy: 'stop loss',
-                message: 'Temporary disabled by stop loss',
-                canResume: true,
-                canRemoveLastBuyPrice: true
-              },
-              60 * 60
-            );
+          it('does not trigger disableAction', () => {
+            expect(mockDisableAction).not.toHaveBeenCalled();
           });
 
           it('triggers getAndCacheOpenOrdersForSymbol', () => {
@@ -2181,23 +2048,6 @@ describe('place-sell-stop-loss-order.js', () => {
                 }
               }
             );
-          });
-
-          it('triggers saveOrder', () => {
-            expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-              order: {
-                symbol: 'ALPHABTC',
-                orderId: 2701762317,
-                orderListId: -1,
-                clientOrderId: '6eGYHaJbmJrIS40eoq8ziM',
-                transactTime: 1626946722520
-              },
-              botStatus: {
-                savedAt: expect.any(String),
-                savedBy: 'place-sell-stop-loss-order',
-                savedMessage: 'The sell STOP-LOSS order is placed.'
-              }
-            });
           });
 
           it('retruns expected value', () => {
@@ -2261,8 +2111,7 @@ describe('place-sell-stop-loss-order.js', () => {
               getAccountInfoFromAPI: mockGetAccountInfoFromAPI,
               isExceedAPILimit: mockIsExceedAPILimit,
               disableAction: mockDisableAction,
-              getAPILimit: mockGetAPILimit,
-              saveOrder: mockSaveOrder
+              getAPILimit: mockGetAPILimit
             }));
 
             jest.mock('../../../trailingTradeHelper/configuration', () => ({
@@ -2325,7 +2174,8 @@ describe('place-sell-stop-loss-order.js', () => {
               sell: {
                 currentPrice: 200,
                 openOrders: []
-              }
+              },
+              canDisable: false
             };
 
             result = await step.execute(loggerMock, rawData);
@@ -2340,17 +2190,8 @@ describe('place-sell-stop-loss-order.js', () => {
             });
           });
 
-          it('triggers disableAction', () => {
-            expect(mockDisableAction).toHaveBeenCalledWith(
-              'BTCBRL',
-              {
-                disabledBy: 'stop loss',
-                message: 'Temporary disabled by stop loss',
-                canResume: true,
-                canRemoveLastBuyPrice: true
-              },
-              60 * 60
-            );
+          it('does not trigger disableAction', () => {
+            expect(mockDisableAction).not.toHaveBeenCalled();
           });
 
           it('triggers getAndCacheOpenOrdersForSymbol', () => {
@@ -2401,23 +2242,6 @@ describe('place-sell-stop-loss-order.js', () => {
                 }
               }
             );
-          });
-
-          it('triggers saveOrder', () => {
-            expect(mockSaveOrder).toHaveBeenCalledWith(loggerMock, {
-              order: {
-                symbol: 'BTCBRL',
-                orderId: 2701762317,
-                orderListId: -1,
-                clientOrderId: '6eGYHaJbmJrIS40eoq8ziM',
-                transactTime: 1626946722520
-              },
-              botStatus: {
-                savedAt: expect.any(String),
-                savedBy: 'place-sell-stop-loss-order',
-                savedMessage: 'The sell STOP-LOSS order is placed.'
-              }
-            });
           });
 
           it('retruns expected value', () => {

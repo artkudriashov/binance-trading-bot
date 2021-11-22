@@ -46,7 +46,8 @@ const cacheExchangeSymbols = async (logger, _globalConfiguration) => {
     await cache.hset(
       'trailing-trade-common',
       'exchange-info',
-      JSON.stringify(exchangeInfo)
+      JSON.stringify(exchangeInfo),
+      3600
     );
   }
 
@@ -70,7 +71,8 @@ const cacheExchangeSymbols = async (logger, _globalConfiguration) => {
   await cache.hset(
     'trailing-trade-common',
     'exchange-symbols',
-    JSON.stringify(exchangeSymbols)
+    JSON.stringify(exchangeSymbols),
+    3600
   );
 
   logger.info({ exchangeSymbols }, 'Saved exchange symbols to cache');
@@ -114,14 +116,14 @@ const extendBalancesWithDustTransfer = async (_logger, rawAccountInfo) => {
       }
 
       // https://academy.binance.com/en/articles/converting-dust-on-binance
-      // In order to qualify the dust must have a value less than 0.0003BTC
+      // In order to qualify the dust must have a value less than 0.001BTC
 
       balance.estimatedBTC = Number(
         parseFloat(cachedLatestCandle.close) * parseFloat(balance.free)
       ).toFixed(8);
 
-      // If the estimated BTC is less than 0.0003, then set dust transfer
-      if (balance.estimatedBTC <= 0.0003) {
+      // If the estimated BTC is less than 0.001, then set dust transfer
+      if (balance.estimatedBTC <= 0.001) {
         balance.canDustTransfer = true;
       }
 
@@ -199,10 +201,7 @@ const getAccountInfo = async logger => {
  * @param {*} logger
  */
 const getOpenOrdersFromAPI = async logger => {
-  logger.info(
-    { debug: true, function: 'openOrders' },
-    'Retrieving open orders from API'
-  );
+  logger.info({ function: 'openOrders' }, 'Retrieving open orders from API');
   const openOrders = await binance.client.openOrders({
     recvWindow: 10000
   });
@@ -219,7 +218,7 @@ const getOpenOrdersFromAPI = async logger => {
  */
 const getOpenOrdersBySymbolFromAPI = async (logger, symbol) => {
   logger.info(
-    { debug: true, function: 'openOrders' },
+    { function: 'openOrders' },
     'Retrieving open orders by symbol from API'
   );
   const openOrders = await binance.client.openOrders({
@@ -253,7 +252,7 @@ const getAndCacheOpenOrdersForSymbol = async (logger, symbol) => {
   );
 
   await cache.hset(
-    'trailing-trade-orders',
+    'trailing-trade-open-orders',
     symbol,
     JSON.stringify(symbolOpenOrders)
   );
@@ -281,10 +280,10 @@ const getLastBuyPrice = async (logger, symbol) =>
  */
 const saveLastBuyPrice = async (logger, symbol, { lastBuyPrice, quantity }) => {
   logger.info(
-    { tag: 'save-last-buy-price', symbol, lastBuyPrice, quantity },
-    'Save last buy price'
+    { lastBuyPrice, quantity, saveLog: true },
+    'The last buy price has been saved.'
   );
-  return mongo.upsertOne(
+  const result = await mongo.upsertOne(
     logger,
     'trailing-trade-symbols',
     { key: `${symbol}-last-buy-price` },
@@ -294,6 +293,24 @@ const saveLastBuyPrice = async (logger, symbol, { lastBuyPrice, quantity }) => {
       quantity
     }
   );
+
+  // Refresh configuration
+  await cache.hdel('trailing-trade-configurations', symbol);
+
+  return result;
+};
+
+const removeLastBuyPrice = async (logger, symbol) => {
+  logger.info({ saveLog: true }, 'The last buy price has been removed.');
+
+  const result = await mongo.deleteOne(logger, 'trailing-trade-symbols', {
+    key: `${symbol}-last-buy-price`
+  });
+
+  // Refresh configuration
+  await cache.hdel('trailing-trade-configurations', symbol);
+
+  return result;
 };
 
 /**
@@ -306,8 +323,8 @@ const saveLastBuyPrice = async (logger, symbol, { lastBuyPrice, quantity }) => {
  * @returns
  */
 const lockSymbol = async (logger, symbol, ttl = 5) => {
-  logger.info({ debug: true, symbol }, `Lock ${symbol} for ${ttl} seconds`);
-  return cache.set(`lock-${symbol}`, true, ttl);
+  logger.info({ symbol }, `Lock ${symbol} for ${ttl} seconds`);
+  return cache.hset('bot-lock', symbol, true, ttl);
 };
 
 /**
@@ -318,18 +335,12 @@ const lockSymbol = async (logger, symbol, ttl = 5) => {
  * @returns
  */
 const isSymbolLocked = async (logger, symbol) => {
-  const isLocked = (await cache.get(`lock-${symbol}`)) === 'true';
+  const isLocked = (await cache.hget('bot-lock', symbol)) === 'true';
 
   if (isLocked === true) {
-    logger.info(
-      { debug: true, symbol, isLocked },
-      `🔒 Symbol is locked - ${symbol}`
-    );
+    logger.info({ symbol, isLocked }, `🔒 Symbol is locked - ${symbol}`);
   } else {
-    logger.info(
-      { debug: true, symbol, isLocked },
-      `🔓 Symbol is not locked - ${symbol} `
-    );
+    logger.info({ symbol, isLocked }, `🔓 Symbol is not locked - ${symbol} `);
   }
   return isLocked;
 };
@@ -342,21 +353,27 @@ const isSymbolLocked = async (logger, symbol) => {
  * @returns
  */
 const unlockSymbol = async (logger, symbol) => {
-  logger.info({ debug: true, symbol }, `Unlock ${symbol}`);
-  return cache.del(`lock-${symbol}`);
+  logger.info({ symbol }, `Unlock ${symbol}`);
+  return cache.hdel('bot-lock', symbol);
 };
 
 /**
  * Disable action
  *
+ * @param {*} logger
  * @param {*} symbol
  * @param {*} reason
  * @param {*} ttl
  *
  * @returns
  */
-const disableAction = async (symbol, reason, ttl) =>
-  cache.set(`${symbol}-disable-action`, JSON.stringify(reason), ttl);
+const disableAction = async (logger, symbol, reason, ttl) => {
+  logger.info(
+    { reason, ttl, saveLog: true },
+    `The action is disabled. Reason: ${_.get(reason, 'message', 'Unknown')}`
+  );
+  return cache.set(`${symbol}-disable-action`, JSON.stringify(reason), ttl);
+};
 
 /**
  * Check if the action is disabled.
@@ -366,6 +383,10 @@ const disableAction = async (symbol, reason, ttl) =>
  */
 const isActionDisabled = async symbol => {
   const result = await cache.getWithTTL(`${symbol}-disable-action`);
+
+  if (result === null) {
+    return { isDisabled: false, ttl: -2 };
+  }
 
   const ttl = result[0][1];
   const reason = JSON.parse(result[1][1]) || {};
@@ -381,7 +402,7 @@ const isActionDisabled = async symbol => {
  * @returns
  */
 const deleteDisableAction = async (logger, symbol) => {
-  logger.info({ debug: true, symbol }, `Enable action for ${symbol}`);
+  logger.info({ saveLog: true }, `The action is enabled.`);
   return cache.del(`${symbol}-disable-action`);
 };
 
@@ -432,8 +453,11 @@ const getOverrideDataForSymbol = async (_logger, symbol) => {
  * @param {*} symbol
  * @returns
  */
-const removeOverrideDataForSymbol = async (_logger, symbol) =>
-  cache.hdel('trailing-trade-override', symbol);
+const removeOverrideDataForSymbol = async (logger, symbol) => {
+  logger.info({ saveLog: true }, 'The override data is removed.');
+
+  return cache.hdel('trailing-trade-override', symbol);
+};
 
 /**
  * Get override data for Indicator
@@ -493,8 +517,8 @@ const calculateLastBuyPrice = async (logger, symbol, order) => {
   const newLastBuyPrice = newTotalAmount / newQuantity;
 
   logger.info(
-    { newLastBuyPrice, newTotalAmount, newQuantity },
-    'New last buy price'
+    { newLastBuyPrice, newTotalAmount, newQuantity, saveLog: true },
+    `The last buy price will be saved. New last buy price: ${newLastBuyPrice}`
   );
   await saveLastBuyPrice(logger, symbol, {
     lastBuyPrice: newLastBuyPrice,
@@ -527,33 +551,6 @@ const calculateLastBuyPrice = async (logger, symbol, order) => {
 };
 
 /**
- * Save order to mongodb
- *
- * @param {*} logger
- * @param {*} data
- */
-const saveOrder = async (logger, data) => {
-  logger.info({ tag: 'save-order', data }, 'Save order');
-
-  // NOTE: Since trailing-trade-orders is not used at the moment,
-  // Disable for reducing unnecessary write.
-  return true;
-  // Order ID must be included.
-  // const {
-  //   order: { orderId }
-  // } = data;
-  // return mongo.upsertOne(
-  //   logger,
-  //   'trailing-trade-orders',
-  //   { key: orderId },
-  //   {
-  //     key: orderId,
-  //     ...data
-  //   }
-  // );
-};
-
-/**
  * Get symbol information
  *
  * @param {*} logger
@@ -577,7 +574,7 @@ const getSymbolInfo = async (logger, symbol) => {
   let exchangeInfo = cachedExchangeInfo;
   if (_.isEmpty(cachedExchangeInfo) === true) {
     logger.info(
-      { debug: true, function: 'exchangeInfo' },
+      { function: 'exchangeInfo' },
       'Request exchange info from Binance.'
     );
     exchangeInfo = await binance.client.exchangeInfo();
@@ -585,7 +582,8 @@ const getSymbolInfo = async (logger, symbol) => {
     await cache.hset(
       'trailing-trade-common',
       'exchange-info',
-      JSON.stringify(exchangeInfo)
+      JSON.stringify(exchangeInfo),
+      3600
     );
   }
 
@@ -628,7 +626,8 @@ const getSymbolInfo = async (logger, symbol) => {
   cache.hset(
     'trailing-trade-symbols',
     `${symbol}-symbol-info`,
-    JSON.stringify(finalSymbolInfo)
+    JSON.stringify(finalSymbolInfo),
+    3600
   );
 
   return finalSymbolInfo;
@@ -665,6 +664,173 @@ const verifyAuthenticated = async (funcLogger, authToken) => {
   return true;
 };
 
+/**
+ * Save number of buy open orders
+ *
+ * @param {*} logger
+ * @param {*} symbols
+ */
+const saveNumberOfBuyOpenOrders = async (logger, symbols) => {
+  const numberOfBuyOpenOrders = await mongo.count(
+    logger,
+    'trailing-trade-grid-trade-orders',
+    {
+      key: {
+        $regex: `(${symbols.join('|')})-grid-trade-last-buy-order`
+      }
+    }
+  );
+
+  await cache.hset(
+    'trailing-trade-common',
+    'number-of-buy-open-orders',
+    numberOfBuyOpenOrders
+  );
+};
+
+/**
+ * Get number of buy open orders
+ *
+ * @param {*} _logger
+ * @returns
+ */
+const getNumberOfBuyOpenOrders = async _logger =>
+  parseInt(
+    (await cache.hget('trailing-trade-common', 'number-of-buy-open-orders')) ||
+      0,
+    10
+  );
+
+/**
+ * Save number of active orders
+ *
+ * @param {*} logger
+ * @param {*} symbols
+ */
+const saveNumberOfOpenTrades = async (logger, symbols) => {
+  const numberOfOpenTrades = await mongo.count(
+    logger,
+    'trailing-trade-symbols',
+    {
+      key: {
+        $regex: `(${symbols.join('|')})-last-buy-price`
+      }
+    }
+  );
+
+  await cache.hset(
+    'trailing-trade-common',
+    'number-of-open-trades',
+    numberOfOpenTrades
+  );
+};
+
+/**
+ * Get number of open trades
+ *
+ * @param {*} _logger
+ * @returns
+ */
+const getNumberOfOpenTrades = async _logger =>
+  parseInt(
+    (await cache.hget('trailing-trade-common', 'number-of-open-trades')) || 0,
+    10
+  );
+
+/**
+ * Save order statistics
+ *
+ * @param {*} logger
+ * @param {*} symbols
+ * @returns
+ */
+const saveOrderStats = async (logger, symbols) =>
+  Promise.all([
+    saveNumberOfBuyOpenOrders(logger, symbols),
+    saveNumberOfOpenTrades(logger, symbols)
+  ]);
+
+/**
+ * Save override action
+ *
+ * @param {*} logger
+ * @param {*} symbol
+ * @param {*} overrideData
+ * @param {*} overrideReason
+ */
+const saveOverrideAction = async (
+  logger,
+  symbol,
+  overrideData,
+  overrideReason
+) => {
+  logger.info(
+    { overrideData, overrideReason, saveLog: true },
+    `The override action is saved. Reason: ${overrideReason}`
+  );
+
+  await cache.hset(
+    'trailing-trade-override',
+    `${symbol}`,
+    JSON.stringify(overrideData)
+  );
+
+  const notify = _.get(overrideData, 'notify', true);
+
+  if (notify) {
+    slack.sendMessage(
+      `${symbol} Action (${moment().format('HH:mm:ss.SSS')}): Queued action: ${
+        overrideData.action
+      }\n` +
+        `- Message: ${overrideReason}\n` +
+        `- Current API Usage: ${getAPILimit(logger)}`
+    );
+
+    PubSub.publish('frontend-notification', {
+      type: 'info',
+      title: overrideReason
+    });
+  }
+};
+
+/**
+ * Save override action for indicator
+ *
+ * @param {*} logger
+ * @param {*} symbol
+ * @param {*} overrideData
+ * @param {*} overrideReason
+ */
+const saveOverrideIndicatorAction = async (
+  logger,
+  type,
+  overrideData,
+  overrideReason
+) => {
+  await cache.hset(
+    'trailing-trade-indicator-override',
+    type,
+    JSON.stringify(overrideData)
+  );
+
+  const notify = _.get(overrideData, 'notify', true);
+
+  if (notify) {
+    slack.sendMessage(
+      `Action (${moment().format('HH:mm:ss.SSS')}): Queued action: ${
+        overrideData.action
+      }\n` +
+        `- Message: ${overrideReason}\n` +
+        `- Current API Usage: ${getAPILimit(logger)}`
+    );
+
+    PubSub.publish('frontend-notification', {
+      type: 'info',
+      title: overrideReason
+    });
+  }
+};
+
 module.exports = {
   cacheExchangeSymbols,
   getAccountInfoFromAPI,
@@ -675,6 +841,7 @@ module.exports = {
   getAndCacheOpenOrdersForSymbol,
   getLastBuyPrice,
   saveLastBuyPrice,
+  removeLastBuyPrice,
   lockSymbol,
   isSymbolLocked,
   unlockSymbol,
@@ -688,7 +855,13 @@ module.exports = {
   getOverrideDataForIndicator,
   removeOverrideDataForIndicator,
   calculateLastBuyPrice,
-  saveOrder,
   getSymbolInfo,
-  verifyAuthenticated
+  verifyAuthenticated,
+  saveNumberOfBuyOpenOrders,
+  getNumberOfBuyOpenOrders,
+  saveNumberOfOpenTrades,
+  getNumberOfOpenTrades,
+  saveOrderStats,
+  saveOverrideAction,
+  saveOverrideIndicatorAction
 };

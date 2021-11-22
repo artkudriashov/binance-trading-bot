@@ -30,9 +30,25 @@ services:
       options:
         max-size: '1G'
 
+  tradingview:
+    container_name: tradingview
+    build:
+      context: ./tradingview
+    networks:
+      - internal
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+    ports:
+      - 8082:8080
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+
   binance-redis:
     container_name: binance-redis
-    image: redis:6.2
+    image: redis:6.2.4
     sysctls:
       net.core.somaxconn: 1024
     restart: unless-stopped

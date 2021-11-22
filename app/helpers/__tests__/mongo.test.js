@@ -10,6 +10,7 @@ describe('mongo.js', () => {
 
   let result;
   let mockCollection;
+  let mockCount;
   let mockFind;
   let mockFindOne;
   let mockAggregate;
@@ -17,6 +18,8 @@ describe('mongo.js', () => {
   let mockUpdateOne;
   let mockDeleteMany;
   let mockDeleteOne;
+  let mockCreateIndex;
+  let mockDropIndex;
 
   beforeEach(() => {
     jest.clearAllMocks().resetModules();
@@ -92,6 +95,58 @@ describe('mongo.js', () => {
       it('does not triggers process.exit', () => {
         expect(process.exit).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('count', () => {
+    beforeEach(async () => {
+      mockCount = jest.fn().mockReturnValue(3);
+      mockCollection = jest.fn(() => ({
+        count: mockCount
+      }));
+
+      mockDBCommand = jest.fn().mockResolvedValue(true);
+      mockDB = jest.fn(() => ({
+        command: mockDBCommand,
+        collection: mockCollection
+      }));
+
+      mockMongoClient = jest.fn(() => ({
+        connect: jest.fn().mockResolvedValue(true),
+        db: mockDB
+      }));
+
+      jest.mock('mongodb', () => ({
+        MongoClient: mockMongoClient
+      }));
+
+      require('mongodb');
+
+      mongo = require('../mongo');
+
+      await mongo.connect(logger);
+
+      result = await mongo.count(logger, 'trailing-trade-symbols', {
+        key: {
+          $regex: '(BTCUSDT|BNBUSDT)-last-buy-price'
+        }
+      });
+    });
+
+    it('triggers database.collection', () => {
+      expect(mockCollection).toHaveBeenCalledWith('trailing-trade-symbols');
+    });
+
+    it('triggers collection.count', () => {
+      expect(mockCount).toHaveBeenCalledWith({
+        key: {
+          $regex: '(BTCUSDT|BNBUSDT)-last-buy-price'
+        }
+      });
+    });
+
+    it('returns expected result', () => {
+      expect(result).toStrictEqual(3);
     });
   });
 
@@ -376,10 +431,18 @@ describe('mongo.js', () => {
     });
 
     it('triggers collection.insertOne', () => {
-      expect(mockInsertOne).toHaveBeenCalledWith({
-        key: 'configuration',
-        my: 'value'
-      });
+      expect(mockInsertOne).toHaveBeenCalledWith(
+        {
+          key: 'configuration',
+          my: 'value'
+        },
+        {
+          writeConcern: {
+            w: 0,
+            j: false
+          }
+        }
+      );
     });
 
     it('returns expected result', () => {
@@ -444,7 +507,11 @@ describe('mongo.js', () => {
           }
         },
         {
-          upsert: true
+          upsert: true,
+          writeConcern: {
+            w: 0,
+            j: false
+          }
         }
       );
     });
@@ -492,9 +559,17 @@ describe('mongo.js', () => {
     });
 
     it('triggers collection.deleteMany', () => {
-      expect(mockDeleteMany).toHaveBeenCalledWith({
-        key: 'configuration'
-      });
+      expect(mockDeleteMany).toHaveBeenCalledWith(
+        {
+          key: 'configuration'
+        },
+        {
+          writeConcern: {
+            w: 0,
+            j: false
+          }
+        }
+      );
     });
 
     it('returns expected result', () => {
@@ -540,9 +615,131 @@ describe('mongo.js', () => {
     });
 
     it('triggers collection.deleteOne', () => {
-      expect(mockDeleteOne).toHaveBeenCalledWith({
-        key: 'configuration'
-      });
+      expect(mockDeleteOne).toHaveBeenCalledWith(
+        {
+          key: 'configuration'
+        },
+        {
+          writeConcern: {
+            w: 0,
+            j: false
+          }
+        }
+      );
+    });
+
+    it('returns expected result', () => {
+      expect(result).toStrictEqual(true);
+    });
+  });
+
+  describe('createIndex', () => {
+    beforeEach(async () => {
+      mockCreateIndex = jest.fn().mockResolvedValue(true);
+      mockCollection = jest.fn(() => ({
+        createIndex: mockCreateIndex
+      }));
+
+      mockDBCommand = jest.fn().mockResolvedValue(true);
+      mockDB = jest.fn(() => ({
+        command: mockDBCommand,
+        collection: mockCollection
+      }));
+
+      mockMongoClient = jest.fn(() => ({
+        connect: jest.fn().mockResolvedValue(true),
+        db: mockDB
+      }));
+
+      jest.mock('mongodb', () => ({
+        MongoClient: mockMongoClient
+      }));
+
+      require('mongodb');
+
+      mongo = require('../mongo');
+
+      await mongo.connect(logger);
+
+      result = await mongo.createIndex(
+        logger,
+        'trailing-trade-logs',
+        {
+          loggedAt: 1
+        },
+        {
+          name: 'trailing-trade-logs-logs-idx',
+          background: true,
+          expireAfterSeconds: 1800
+        }
+      );
+    });
+
+    it('triggers database.collection', () => {
+      expect(mockCollection).toHaveBeenCalledWith('trailing-trade-logs');
+    });
+
+    it('triggers collection.createIndex', () => {
+      expect(mockCreateIndex).toHaveBeenCalledWith(
+        {
+          loggedAt: 1
+        },
+        {
+          name: 'trailing-trade-logs-logs-idx',
+          background: true,
+          expireAfterSeconds: 1800
+        }
+      );
+    });
+
+    it('returns expected result', () => {
+      expect(result).toStrictEqual(true);
+    });
+  });
+
+  describe('dropIndex', () => {
+    beforeEach(async () => {
+      mockDropIndex = jest.fn().mockResolvedValue(true);
+      mockCollection = jest.fn(() => ({
+        dropIndex: mockDropIndex
+      }));
+
+      mockDBCommand = jest.fn().mockResolvedValue(true);
+      mockDB = jest.fn(() => ({
+        command: mockDBCommand,
+        collection: mockCollection
+      }));
+
+      mockMongoClient = jest.fn(() => ({
+        connect: jest.fn().mockResolvedValue(true),
+        db: mockDB
+      }));
+
+      jest.mock('mongodb', () => ({
+        MongoClient: mockMongoClient
+      }));
+
+      require('mongodb');
+
+      mongo = require('../mongo');
+
+      await mongo.connect(logger);
+
+      result = await mongo.dropIndex(
+        logger,
+        'trailing-trade-logs',
+        'trailing-trade-logs-logs-idx'
+      );
+    });
+
+    it('triggers database.collection', () => {
+      expect(mockCollection).toHaveBeenCalledWith('trailing-trade-logs');
+    });
+
+    it('triggers collection.dropIndex', () => {
+      expect(mockDropIndex).toHaveBeenCalledWith(
+        'trailing-trade-logs-logs-idx'
+      );
     });
 
     it('returns expected result', () => {

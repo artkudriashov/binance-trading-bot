@@ -3,8 +3,13 @@
 /* eslint-disable no-undef */
 class CoinWrapper extends React.Component {
   render() {
-    const { symbolInfo, sendWebSocket, configuration, isAuthenticated } =
-      this.props;
+    const {
+      connected,
+      symbolInfo,
+      sendWebSocket,
+      configuration,
+      isAuthenticated
+    } = this.props;
 
     const {
       symbol,
@@ -65,12 +70,16 @@ class CoinWrapper extends React.Component {
             sendWebSocket={sendWebSocket}
             isAuthenticated={isAuthenticated}
           />
+          <CoinWrapperTradingView
+            symbolInfo={symbolInfo}
+            connected={connected}></CoinWrapperTradingView>
 
           <CoinWrapperBuySignal
             symbolInfo={symbolInfo}
             sendWebSocket={sendWebSocket}
             isAuthenticated={isAuthenticated}
           />
+
           <CoinWrapperBuyOrders
             symbolInfo={symbolInfo}
             sendWebSocket={sendWebSocket}

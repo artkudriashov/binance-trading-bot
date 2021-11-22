@@ -1,12 +1,11 @@
 /* eslint-disable no-await-in-loop */
 const moment = require('moment');
-const _ = require('lodash');
 
-const { slack, binance } = require('../../../helpers');
+const { binance } = require('../../../helpers');
 const {
   getAndCacheOpenOrdersForSymbol,
   getAccountInfoFromAPI,
-  getAPILimit
+  saveOverrideAction
 } = require('../../trailingTradeHelper/common');
 
 /**
@@ -18,8 +17,8 @@ const {
  */
 const cancelOrder = async (logger, symbol, order) => {
   logger.info(
-    { debug: true, function: 'cancelOrder', order },
-    'Cancelling open orders'
+    { function: 'cancelOrder', order, saveLog: true },
+    'The order will be cancelled.'
   );
   // Cancel open orders first to make sure it does not have unsettled orders.
   let result = false;
@@ -33,8 +32,9 @@ const cancelOrder = async (logger, symbol, order) => {
     result = true;
   } catch (e) {
     logger.info(
-      { e },
-      'Cancel failed, but it is ok. The order may already be executed. We just wait for next round to be handled'
+      { e, saveLog: true },
+      `Order cancellation failed, but it is ok. ` +
+        `The order may already be cancelled or executed. The bot will check in the next tick.`
     );
   }
 
@@ -53,7 +53,6 @@ const execute = async (logger, rawData) => {
 
   const {
     symbol,
-    featureToggle,
     action,
     isLocked,
     openOrders,
@@ -112,24 +111,18 @@ const execute = async (logger, rawData) => {
 
           data.action = 'buy-order-checking';
 
-          if (_.get(featureToggle, 'notifyDebug', false) === true) {
-            slack.sendMessage(
-              `${symbol} Action (${moment().format(
-                'HH:mm:ss.SSS'
-              )}): Failed cancelling buy order\n` +
-                `- Message: Binance API returned an error when cancelling the buy order.` +
-                ` Refreshed open orders and wait for next tick.\n` +
-                `\`\`\`${JSON.stringify(
-                  {
-                    order,
-                    openOrders: data.openOrders
-                  },
-                  undefined,
-                  2
-                )}\`\`\`\n` +
-                `- Current API Usage: ${getAPILimit(logger)}`
-            );
-          }
+          await saveOverrideAction(
+            logger,
+            symbol,
+            {
+              action: 'buy',
+              actionAt: moment().format(),
+              triggeredBy: 'buy-cancelled',
+              notify: false,
+              checkTradingView: true
+            },
+            `The bot will place a buy order in the next tick because could not retrieve the cancelled order result.`
+          );
         } else {
           // Reset buy open orders
           data.buy.openOrders = [];
@@ -178,26 +171,6 @@ const execute = async (logger, rawData) => {
           data.accountInfo = await getAccountInfoFromAPI(logger);
 
           data.action = 'sell-order-checking';
-
-          if (_.get(featureToggle, 'notifyDebug', false) === true) {
-            slack.sendMessage(
-              `${symbol} Action (${moment().format(
-                'HH:mm:ss.SSS'
-              )}): Failed cancelling sell order\n` +
-                `- Message: Binance API returned an error when cancelling the buy order.` +
-                ` Refreshed open orders and wait for next tick.\n` +
-                `\`\`\`${JSON.stringify(
-                  {
-                    order,
-                    openOrders: data.openOrders,
-                    accountInfo: data.accountInfo
-                  },
-                  undefined,
-                  2
-                )}\`\`\`\n` +
-                `- Current API Usage: ${getAPILimit(logger)}`
-            );
-          }
         } else {
           // Reset sell open orders
           data.sell.openOrders = [];

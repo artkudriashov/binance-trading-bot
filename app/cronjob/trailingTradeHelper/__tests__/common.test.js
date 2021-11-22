@@ -66,7 +66,8 @@ describe('common.js', () => {
           'exchange-info',
           JSON.stringify(
             _.cloneDeep(require('./fixtures/binance-exchange-info.json'))
-          )
+          ),
+          3600
         );
       });
 
@@ -76,7 +77,8 @@ describe('common.js', () => {
           'exchange-symbols',
           JSON.stringify(
             require('./fixtures/binance-cached-exchange-symbols.json')
-          )
+          ),
+          3600
         );
       });
     });
@@ -140,7 +142,8 @@ describe('common.js', () => {
             'exchange-info',
             JSON.stringify(
               _.cloneDeep(require('./fixtures/binance-exchange-info.json'))
-            )
+            ),
+            3600
           );
         });
 
@@ -150,7 +153,8 @@ describe('common.js', () => {
             'exchange-symbols',
             JSON.stringify(
               require('./fixtures/binance-cached-exchange-symbols.json')
-            )
+            ),
+            3600
           );
         });
       });
@@ -213,7 +217,8 @@ describe('common.js', () => {
             'exchange-info',
             JSON.stringify(
               _.cloneDeep(require('./fixtures/binance-exchange-info.json'))
-            )
+            ),
+            3600
           );
         });
 
@@ -223,7 +228,8 @@ describe('common.js', () => {
             'exchange-symbols',
             JSON.stringify(
               require('./fixtures/binance-cached-exchange-symbols.json')
-            )
+            ),
+            3600
           );
         });
       });
@@ -284,7 +290,8 @@ describe('common.js', () => {
           'exchange-info',
           JSON.stringify(
             _.cloneDeep(require('./fixtures/binance-exchange-info.json'))
-          )
+          ),
+          3600
         );
       });
 
@@ -294,7 +301,8 @@ describe('common.js', () => {
           'exchange-symbols',
           JSON.stringify(
             require('./fixtures/binance-cached-exchange-symbols.json')
-          )
+          ),
+          3600
         );
       });
     });
@@ -634,7 +642,7 @@ describe('common.js', () => {
 
     it('triggers cache.hset', () => {
       expect(cacheMock.hset).toHaveBeenCalledWith(
-        'trailing-trade-orders',
+        'trailing-trade-open-orders',
         'BTCUSDT',
         JSON.stringify([
           {
@@ -715,12 +723,14 @@ describe('common.js', () => {
 
   describe('saveLastBuyPrice', () => {
     beforeEach(async () => {
-      const { mongo, logger } = require('../../../helpers');
+      const { cache, mongo, logger } = require('../../../helpers');
 
+      cacheMock = cache;
       mongoMock = mongo;
       loggerMock = logger;
 
       mongoMock.upsertOne = jest.fn().mockResolvedValue(true);
+      cacheMock.hdel = jest.fn().mockResolvedValue(true);
 
       commonHelper = require('../common');
       result = await commonHelper.saveLastBuyPrice(loggerMock, 'BTCUSDT', {
@@ -742,6 +752,48 @@ describe('common.js', () => {
       );
     });
 
+    it('triggers cache.hdel', () => {
+      expect(cacheMock.hdel).toHaveBeenCalledWith(
+        'trailing-trade-configurations',
+        'BTCUSDT'
+      );
+    });
+
+    it('returns expected value', () => {
+      expect(result).toBeTruthy();
+    });
+  });
+
+  describe('removeLastBuyPrice', () => {
+    beforeEach(async () => {
+      const { cache, mongo, logger } = require('../../../helpers');
+
+      cacheMock = cache;
+      mongoMock = mongo;
+      loggerMock = logger;
+
+      mongoMock.deleteOne = jest.fn().mockResolvedValue(true);
+      cacheMock.hdel = jest.fn().mockResolvedValue(true);
+
+      commonHelper = require('../common');
+      result = await commonHelper.removeLastBuyPrice(loggerMock, 'BTCUSDT');
+    });
+
+    it('triggers mongo.deleteOne', () => {
+      expect(mongoMock.deleteOne).toHaveBeenCalledWith(
+        loggerMock,
+        'trailing-trade-symbols',
+        { key: 'BTCUSDT-last-buy-price' }
+      );
+    });
+
+    it('triggers cache.hdel', () => {
+      expect(cacheMock.hdel).toHaveBeenCalledWith(
+        'trailing-trade-configurations',
+        'BTCUSDT'
+      );
+    });
+
     it('returns expected value', () => {
       expect(result).toBeTruthy();
     });
@@ -755,14 +807,19 @@ describe('common.js', () => {
         cacheMock = cache;
         loggerMock = logger;
 
-        cacheMock.set = jest.fn().mockResolvedValue(true);
+        cacheMock.hset = jest.fn().mockResolvedValue(true);
 
         commonHelper = require('../common');
         result = await commonHelper.lockSymbol(loggerMock, 'BTCUSDT');
       });
 
-      it('triggers cache.set', () => {
-        expect(cacheMock.set).toHaveBeenCalledWith('lock-BTCUSDT', true, 5);
+      it('triggers cache.hset', () => {
+        expect(cacheMock.hset).toHaveBeenCalledWith(
+          'bot-lock',
+          'BTCUSDT',
+          true,
+          5
+        );
       });
 
       it('returns expected value', () => {
@@ -777,14 +834,19 @@ describe('common.js', () => {
         cacheMock = cache;
         loggerMock = logger;
 
-        cacheMock.set = jest.fn().mockResolvedValue(true);
+        cacheMock.hset = jest.fn().mockResolvedValue(true);
 
         commonHelper = require('../common');
         result = await commonHelper.lockSymbol(loggerMock, 'BTCUSDT', 10);
       });
 
-      it('triggers cache.set', () => {
-        expect(cacheMock.set).toHaveBeenCalledWith('lock-BTCUSDT', true, 10);
+      it('triggers cache.hset', () => {
+        expect(cacheMock.hset).toHaveBeenCalledWith(
+          'bot-lock',
+          'BTCUSDT',
+          true,
+          10
+        );
       });
 
       it('returns expected value', () => {
@@ -801,14 +863,14 @@ describe('common.js', () => {
         cacheMock = cache;
         loggerMock = logger;
 
-        cacheMock.get = jest.fn().mockResolvedValue('true');
+        cacheMock.hget = jest.fn().mockResolvedValue('true');
 
         commonHelper = require('../common');
         result = await commonHelper.isSymbolLocked(loggerMock, 'BTCUSDT');
       });
 
-      it('triggers cache.get', () => {
-        expect(cacheMock.get).toHaveBeenCalledWith('lock-BTCUSDT');
+      it('triggers cache.hget', () => {
+        expect(cacheMock.hget).toHaveBeenCalledWith('bot-lock', 'BTCUSDT');
       });
 
       it('returns expected value', () => {
@@ -823,14 +885,14 @@ describe('common.js', () => {
         cacheMock = cache;
         loggerMock = logger;
 
-        cacheMock.get = jest.fn().mockResolvedValue(null);
+        cacheMock.hget = jest.fn().mockResolvedValue(null);
 
         commonHelper = require('../common');
         result = await commonHelper.isSymbolLocked(loggerMock, 'BTCUSDT');
       });
 
-      it('triggers cache.get', () => {
-        expect(cacheMock.get).toHaveBeenCalledWith('lock-BTCUSDT');
+      it('triggers cache.hget', () => {
+        expect(cacheMock.hget).toHaveBeenCalledWith('bot-lock', 'BTCUSDT');
       });
 
       it('returns expected value', () => {
@@ -846,14 +908,14 @@ describe('common.js', () => {
       cacheMock = cache;
       loggerMock = logger;
 
-      cacheMock.del = jest.fn().mockResolvedValue(true);
+      cacheMock.hdel = jest.fn().mockResolvedValue(true);
 
       commonHelper = require('../common');
       result = await commonHelper.unlockSymbol(loggerMock, 'BTCUSDT');
     });
 
-    it('triggers cache.del', () => {
-      expect(cacheMock.del).toHaveBeenCalledWith('lock-BTCUSDT');
+    it('triggers cache.hdel', () => {
+      expect(cacheMock.hdel).toHaveBeenCalledWith('bot-lock', 'BTCUSDT');
     });
 
     it('returns expected value', () => {
@@ -871,6 +933,7 @@ describe('common.js', () => {
 
       commonHelper = require('../common');
       result = await commonHelper.disableAction(
+        loggerMock,
         'BTCUSDT',
         { some: 'reason' },
         60
@@ -955,6 +1018,33 @@ describe('common.js', () => {
           message: 'Temporary disabled by stop loss',
           canResume: true,
           canRemoveLastBuyPrice: true
+        });
+      });
+    });
+
+    describe('when cannot get value', () => {
+      beforeEach(async () => {
+        const { cache, logger } = require('../../../helpers');
+
+        cacheMock = cache;
+        loggerMock = logger;
+
+        cacheMock.getWithTTL = jest.fn().mockResolvedValue(null);
+
+        commonHelper = require('../common');
+        result = await commonHelper.isActionDisabled('BTCUSDT');
+      });
+
+      it('triggers cache.getWithTTL', () => {
+        expect(cacheMock.getWithTTL).toHaveBeenCalledWith(
+          'BTCUSDT-disable-action'
+        );
+      });
+
+      it('returns expected value', () => {
+        expect(result).toStrictEqual({
+          isDisabled: false,
+          ttl: -2
         });
       });
     });
@@ -1241,17 +1331,25 @@ describe('common.js', () => {
   describe('calculateLastBuyPrice', () => {
     describe('when last buy price is not recorded', () => {
       beforeEach(async () => {
-        const { logger, mongo, PubSub, slack } = require('../../../helpers');
+        const {
+          cache,
+          logger,
+          mongo,
+          PubSub,
+          slack
+        } = require('../../../helpers');
 
         loggerMock = logger;
         mongoMock = mongo;
         PubSubMock = PubSub;
         slackMock = slack;
+        cacheMock = cache;
 
         mongoMock.findOne = jest.fn().mockResolvedValue({});
         mongoMock.upsertOne = jest.fn().mockResolvedValue(true);
         PubSubMock.publish = jest.fn().mockResolvedValue(true);
         slackMock.sendMessage = jest.fn().mockResolvedValue(true);
+        cacheMock.hdel = jest.fn().mockResolvedValue(true);
 
         commonHelper = require('../common');
         await commonHelper.calculateLastBuyPrice(loggerMock, 'BTCUSDT', {
@@ -1310,12 +1408,19 @@ describe('common.js', () => {
 
     describe('when last buy price is recorded', () => {
       beforeEach(async () => {
-        const { logger, mongo, PubSub, slack } = require('../../../helpers');
+        const {
+          logger,
+          mongo,
+          PubSub,
+          slack,
+          cache
+        } = require('../../../helpers');
 
         loggerMock = logger;
         mongoMock = mongo;
         PubSubMock = PubSub;
         slackMock = slack;
+        cacheMock = cache;
 
         mongoMock.findOne = jest.fn().mockResolvedValue({
           lastBuyPrice: 254.37,
@@ -1324,6 +1429,7 @@ describe('common.js', () => {
         mongoMock.upsertOne = jest.fn().mockResolvedValue(true);
         PubSubMock.publish = jest.fn().mockResolvedValue(true);
         slackMock.sendMessage = jest.fn().mockResolvedValue(true);
+        cacheMock.hdel = jest.fn().mockResolvedValue(true);
 
         commonHelper = require('../common');
         await commonHelper.calculateLastBuyPrice(loggerMock, 'BTCUSDT', {
@@ -1378,49 +1484,6 @@ describe('common.js', () => {
           )
         );
       });
-    });
-  });
-
-  describe('saveOrder', () => {
-    beforeEach(async () => {
-      const { mongo, logger } = require('../../../helpers');
-
-      mongoMock = mongo;
-      loggerMock = logger;
-
-      mongoMock.upsertOne = jest.fn().mockResolvedValue(true);
-
-      commonHelper = require('../common');
-      result = await commonHelper.saveOrder(loggerMock, {
-        order: {
-          orderId: 123456
-        },
-        botStatus: {
-          some: 'value'
-        }
-      });
-    });
-
-    // eslint-disable-next-line jest/no-commented-out-tests
-    // it('triggers mongo.upsertOne', () => {
-    //   expect(mongoMock.upsertOne).toHaveBeenCalledWith(
-    //     loggerMock,
-    //     'trailing-trade-orders',
-    //     { key: 123456 },
-    //     {
-    //       key: 123456,
-    //       order: {
-    //         orderId: 123456
-    //       },
-    //       botStatus: {
-    //         some: 'value'
-    //       }
-    //     }
-    //   );
-    // });
-
-    it('returns expected value', () => {
-      expect(result).toBeTruthy();
     });
   });
 
@@ -1844,6 +1907,544 @@ describe('common.js', () => {
         it('returns true', () => {
           expect(result).toBeTruthy();
         });
+      });
+    });
+  });
+
+  describe('saveNumberOfBuyOpenOrders', () => {
+    beforeEach(async () => {
+      const { mongo, cache, logger } = require('../../../helpers');
+
+      mongoMock = mongo;
+      loggerMock = logger;
+      cacheMock = cache;
+
+      mongoMock.count = jest.fn().mockResolvedValue(3);
+
+      cacheMock.hset = jest.fn().mockResolvedValue(true);
+
+      commonHelper = require('../common');
+      result = await commonHelper.saveNumberOfBuyOpenOrders(loggerMock, [
+        'BTCUSDT',
+        'BNBUSDT'
+      ]);
+    });
+
+    it('triggers mongo.count', () => {
+      expect(mongoMock.count).toHaveBeenCalledWith(
+        loggerMock,
+        'trailing-trade-grid-trade-orders',
+        {
+          key: {
+            $regex: `(BTCUSDT|BNBUSDT)-grid-trade-last-buy-order`
+          }
+        }
+      );
+    });
+
+    it('triggers cache.hset', () => {
+      expect(cacheMock.hset).toHaveBeenCalledWith(
+        'trailing-trade-common',
+        'number-of-buy-open-orders',
+        3
+      );
+    });
+  });
+
+  describe('getNumberOfBuyOpenOrders', () => {
+    describe('when value is available', () => {
+      beforeEach(async () => {
+        const { cache, logger } = require('../../../helpers');
+
+        loggerMock = logger;
+        cacheMock = cache;
+
+        cacheMock.hget = jest.fn().mockResolvedValue(3);
+
+        commonHelper = require('../common');
+        result = await commonHelper.getNumberOfBuyOpenOrders(loggerMock);
+      });
+
+      it('triggers cache.hget', () => {
+        expect(cacheMock.hget).toHaveBeenCalledWith(
+          'trailing-trade-common',
+          'number-of-buy-open-orders'
+        );
+      });
+
+      it('returns expected value', () => {
+        expect(result).toStrictEqual(3);
+      });
+    });
+
+    describe('when value is not available', () => {
+      beforeEach(async () => {
+        const { cache, logger } = require('../../../helpers');
+
+        loggerMock = logger;
+        cacheMock = cache;
+
+        cacheMock.hget = jest.fn().mockResolvedValue(null);
+
+        commonHelper = require('../common');
+        result = await commonHelper.getNumberOfBuyOpenOrders(loggerMock);
+      });
+
+      it('triggers cache.hget', () => {
+        expect(cacheMock.hget).toHaveBeenCalledWith(
+          'trailing-trade-common',
+          'number-of-buy-open-orders'
+        );
+      });
+
+      it('returns expected value', () => {
+        expect(result).toStrictEqual(0);
+      });
+    });
+  });
+
+  describe('saveNumberOfOpenTrades', () => {
+    beforeEach(async () => {
+      const { mongo, cache, logger } = require('../../../helpers');
+
+      mongoMock = mongo;
+      loggerMock = logger;
+      cacheMock = cache;
+
+      mongoMock.count = jest.fn().mockResolvedValue(3);
+
+      cacheMock.hset = jest.fn().mockResolvedValue(true);
+
+      commonHelper = require('../common');
+      result = await commonHelper.saveNumberOfOpenTrades(loggerMock, [
+        'BTCUSDT',
+        'BNBUSDT'
+      ]);
+    });
+
+    it('triggers mongo.count', () => {
+      expect(mongoMock.count).toHaveBeenCalledWith(
+        loggerMock,
+        'trailing-trade-symbols',
+        {
+          key: {
+            $regex: `(BTCUSDT|BNBUSDT)-last-buy-price`
+          }
+        }
+      );
+    });
+
+    it('triggers cache.hset', () => {
+      expect(cacheMock.hset).toHaveBeenCalledWith(
+        'trailing-trade-common',
+        'number-of-open-trades',
+        3
+      );
+    });
+  });
+
+  describe('getNumberOfOpenTrades', () => {
+    describe('when value is available', () => {
+      beforeEach(async () => {
+        const { cache, logger } = require('../../../helpers');
+
+        loggerMock = logger;
+        cacheMock = cache;
+
+        cacheMock.hget = jest.fn().mockResolvedValue(3);
+
+        commonHelper = require('../common');
+        result = await commonHelper.getNumberOfOpenTrades(loggerMock);
+      });
+
+      it('triggers cache.hget', () => {
+        expect(cacheMock.hget).toHaveBeenCalledWith(
+          'trailing-trade-common',
+          'number-of-open-trades'
+        );
+      });
+
+      it('returns expected value', () => {
+        expect(result).toStrictEqual(3);
+      });
+    });
+
+    describe('when value is not available', () => {
+      beforeEach(async () => {
+        const { cache, logger } = require('../../../helpers');
+
+        loggerMock = logger;
+        cacheMock = cache;
+
+        cacheMock.hget = jest.fn().mockResolvedValue(null);
+
+        commonHelper = require('../common');
+        result = await commonHelper.getNumberOfOpenTrades(loggerMock);
+      });
+
+      it('triggers cache.hget', () => {
+        expect(cacheMock.hget).toHaveBeenCalledWith(
+          'trailing-trade-common',
+          'number-of-open-trades'
+        );
+      });
+
+      it('returns expected value', () => {
+        expect(result).toStrictEqual(0);
+      });
+    });
+  });
+
+  describe('saveOrderStats', () => {
+    beforeEach(async () => {
+      const { mongo, cache, logger } = require('../../../helpers');
+
+      mongoMock = mongo;
+      loggerMock = logger;
+      cacheMock = cache;
+
+      mongoMock.count = jest.fn().mockResolvedValue(3);
+
+      cacheMock.hset = jest.fn().mockResolvedValue(true);
+
+      commonHelper = require('../common');
+      result = await commonHelper.saveOrderStats(loggerMock, [
+        'BTCUSDT',
+        'BNBUSDT'
+      ]);
+    });
+
+    it('triggers mongo.count twice', () => {
+      expect(mongoMock.count).toHaveBeenCalledTimes(2);
+    });
+
+    it('triggers cache.hset', () => {
+      expect(cacheMock.hset).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('saveOverrideAction', () => {
+    beforeEach(() => {
+      const { cache, slack, PubSub, logger } = require('../../../helpers');
+
+      slackMock = slack;
+      loggerMock = logger;
+      PubSubMock = PubSub;
+      cacheMock = cache;
+
+      cacheMock.hset = jest.fn().mockResolvedValue(true);
+      slackMock.sendMessage = jest.fn().mockResolvedValue(true);
+      PubSubMock.publish = jest.fn().mockResolvedValue(true);
+      commonHelper = require('../common');
+    });
+
+    describe('without notify flag determined', () => {
+      beforeEach(async () => {
+        result = await commonHelper.saveOverrideAction(
+          loggerMock,
+          'BTCUSDT',
+          {
+            action: 'buy',
+            actionAt: '2021-09-22T00:20:00Z',
+            triggeredBy: 'auto-trigger'
+          },
+          `The bot queued to trigger the grid trade for buying` +
+            ` after 20 minutes later.`
+        );
+      });
+
+      it('triggers cache.hset', () => {
+        expect(cacheMock.hset).toHaveBeenCalledWith(
+          'trailing-trade-override',
+          'BTCUSDT',
+          JSON.stringify({
+            action: 'buy',
+            actionAt: '2021-09-22T00:20:00Z',
+            triggeredBy: 'auto-trigger'
+          })
+        );
+      });
+
+      it('triggers slack.sendMessage', () => {
+        expect(slackMock.sendMessage).toHaveBeenCalledWith(
+          expect.stringContaining('BTCUSDT')
+        );
+
+        expect(slackMock.sendMessage).toHaveBeenCalledWith(
+          expect.stringContaining(
+            'The bot queued to trigger the grid trade for buying'
+          )
+        );
+      });
+
+      it('triggers PubSub.publish', () => {
+        expect(PubSubMock.publish).toHaveBeenCalledWith(
+          'frontend-notification',
+          {
+            type: 'info',
+            title:
+              `The bot queued to trigger the grid trade for buying` +
+              ` after 20 minutes later.`
+          }
+        );
+      });
+    });
+
+    describe('with notify flag is true', () => {
+      beforeEach(async () => {
+        result = await commonHelper.saveOverrideAction(
+          loggerMock,
+          'BTCUSDT',
+          {
+            action: 'buy',
+            actionAt: '2021-09-22T00:20:00Z',
+            triggeredBy: 'auto-trigger',
+            notify: true
+          },
+          `The bot queued to trigger the grid trade for buying` +
+            ` after 20 minutes later.`
+        );
+      });
+
+      it('triggers cache.hset', () => {
+        expect(cacheMock.hset).toHaveBeenCalledWith(
+          'trailing-trade-override',
+          'BTCUSDT',
+          JSON.stringify({
+            action: 'buy',
+            actionAt: '2021-09-22T00:20:00Z',
+            triggeredBy: 'auto-trigger',
+            notify: true
+          })
+        );
+      });
+
+      it('triggers slack.sendMessage', () => {
+        expect(slackMock.sendMessage).toHaveBeenCalledWith(
+          expect.stringContaining('BTCUSDT')
+        );
+
+        expect(slackMock.sendMessage).toHaveBeenCalledWith(
+          expect.stringContaining(
+            'The bot queued to trigger the grid trade for buying'
+          )
+        );
+      });
+
+      it('triggers PubSub.publish', () => {
+        expect(PubSubMock.publish).toHaveBeenCalledWith(
+          'frontend-notification',
+          {
+            type: 'info',
+            title:
+              `The bot queued to trigger the grid trade for buying` +
+              ` after 20 minutes later.`
+          }
+        );
+      });
+    });
+
+    describe('with notify flag is false', () => {
+      beforeEach(async () => {
+        result = await commonHelper.saveOverrideAction(
+          loggerMock,
+          'BTCUSDT',
+          {
+            action: 'buy',
+            actionAt: '2021-09-22T00:20:00Z',
+            triggeredBy: 'auto-trigger',
+            notify: false
+          },
+          `The bot queued to trigger the grid trade for buying` +
+            ` after 20 minutes later.`
+        );
+      });
+
+      it('triggers cache.hset', () => {
+        expect(cacheMock.hset).toHaveBeenCalledWith(
+          'trailing-trade-override',
+          'BTCUSDT',
+          JSON.stringify({
+            action: 'buy',
+            actionAt: '2021-09-22T00:20:00Z',
+            triggeredBy: 'auto-trigger',
+            notify: false
+          })
+        );
+      });
+
+      it('does not trigger slack.sendMessage', () => {
+        expect(slackMock.sendMessage).not.toHaveBeenCalled();
+      });
+
+      it('does not trigger PubSub.publish', () => {
+        expect(PubSubMock.publish).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('saveOverrideIndicatorAction', () => {
+    beforeEach(() => {
+      const { cache, slack, PubSub, logger } = require('../../../helpers');
+
+      slackMock = slack;
+      loggerMock = logger;
+      PubSubMock = PubSub;
+      cacheMock = cache;
+
+      cacheMock.hset = jest.fn().mockResolvedValue(true);
+      slackMock.sendMessage = jest.fn().mockResolvedValue(true);
+      PubSubMock.publish = jest.fn().mockResolvedValue(true);
+
+      commonHelper = require('../common');
+    });
+
+    describe('without notify flag determined', () => {
+      beforeEach(async () => {
+        result = await commonHelper.saveOverrideIndicatorAction(
+          loggerMock,
+          'global',
+          {
+            action: 'dust-transfer',
+            params: {
+              some: 'param'
+            },
+            actionAt: '2021-09-25T00:00:00Z',
+            triggeredBy: 'user'
+          },
+          'The dust transfer request received by the bot. Wait for executing the dust transfer.'
+        );
+      });
+
+      it('triggers cache.hset', () => {
+        expect(cacheMock.hset).toHaveBeenCalledWith(
+          'trailing-trade-indicator-override',
+          'global',
+          JSON.stringify({
+            action: 'dust-transfer',
+            params: {
+              some: 'param'
+            },
+            actionAt: '2021-09-25T00:00:00Z',
+            triggeredBy: 'user'
+          })
+        );
+      });
+
+      it('triggers slack.sendMessage', () => {
+        expect(slackMock.sendMessage).toHaveBeenCalledWith(
+          expect.stringContaining(
+            'The dust transfer request received by the bot. Wait for executing the dust transfer.'
+          )
+        );
+      });
+
+      it('triggers PubSub.publish', () => {
+        expect(PubSubMock.publish).toHaveBeenCalledWith(
+          'frontend-notification',
+          {
+            type: 'info',
+            title:
+              'The dust transfer request received by the bot. Wait for executing the dust transfer.'
+          }
+        );
+      });
+    });
+
+    describe('with notify flag is true', () => {
+      beforeEach(async () => {
+        result = await commonHelper.saveOverrideIndicatorAction(
+          loggerMock,
+          'global',
+          {
+            action: 'dust-transfer',
+            params: {
+              some: 'param'
+            },
+            actionAt: '2021-09-25T00:00:00Z',
+            triggeredBy: 'user',
+            notify: true
+          },
+          'The dust transfer request received by the bot. Wait for executing the dust transfer.'
+        );
+      });
+
+      it('triggers cache.hset', () => {
+        expect(cacheMock.hset).toHaveBeenCalledWith(
+          'trailing-trade-indicator-override',
+          'global',
+          JSON.stringify({
+            action: 'dust-transfer',
+            params: {
+              some: 'param'
+            },
+            actionAt: '2021-09-25T00:00:00Z',
+            triggeredBy: 'user',
+            notify: true
+          })
+        );
+      });
+
+      it('triggers slack.sendMessage', () => {
+        expect(slackMock.sendMessage).toHaveBeenCalledWith(
+          expect.stringContaining(
+            'The dust transfer request received by the bot. Wait for executing the dust transfer.'
+          )
+        );
+      });
+
+      it('triggers PubSub.publish', () => {
+        expect(PubSubMock.publish).toHaveBeenCalledWith(
+          'frontend-notification',
+          {
+            type: 'info',
+            title:
+              'The dust transfer request received by the bot. Wait for executing the dust transfer.'
+          }
+        );
+      });
+    });
+
+    describe('with notify flag is false', () => {
+      beforeEach(async () => {
+        result = await commonHelper.saveOverrideIndicatorAction(
+          loggerMock,
+          'global',
+          {
+            action: 'dust-transfer',
+            params: {
+              some: 'param'
+            },
+            actionAt: '2021-09-25T00:00:00Z',
+            triggeredBy: 'user',
+            notify: false
+          },
+          'The dust transfer request received by the bot. Wait for executing the dust transfer.'
+        );
+      });
+
+      it('triggers cache.hset', () => {
+        expect(cacheMock.hset).toHaveBeenCalledWith(
+          'trailing-trade-indicator-override',
+          'global',
+          JSON.stringify({
+            action: 'dust-transfer',
+            params: {
+              some: 'param'
+            },
+            actionAt: '2021-09-25T00:00:00Z',
+            triggeredBy: 'user',
+            notify: false
+          })
+        );
+      });
+
+      it('does not trigger slack.sendMessage', () => {
+        expect(slackMock.sendMessage).not.toHaveBeenCalled();
+      });
+
+      it('does not trigger PubSub.publish', () => {
+        expect(PubSubMock.publish).not.toHaveBeenCalled();
       });
     });
   });

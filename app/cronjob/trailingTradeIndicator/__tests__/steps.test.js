@@ -11,8 +11,10 @@ describe('steps.js', () => {
       getAccountInfo: expect.any(Function),
       getIndicators: expect.any(Function),
       getOpenOrders: expect.any(Function),
-      getClosedTrades: expect.any(Function),
       executeDustTransfer: expect.any(Function),
+      getClosedTrades: expect.any(Function),
+      getOrderStats: expect.any(Function),
+      getTradingView: expect.any(Function),
       saveDataToCache: expect.any(Function)
     });
   });

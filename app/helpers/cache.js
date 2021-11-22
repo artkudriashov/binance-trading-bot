@@ -5,7 +5,8 @@ const Redlock = require('redlock');
 const redis = new Redis({
   host: config.get('redis.host'),
   port: config.get('redis.port'),
-  password: config.get('redis.password')
+  password: config.get('redis.password'),
+  db: config.get('redis.db')
 });
 
 const redlock = new Redlock([redis], {
@@ -25,6 +26,14 @@ const redlock = new Redlock([redis], {
   // see https://www.awsarchitectureblog.com/2015/03/backoff.html
   retryJitter: 10 // time in ms
 });
+
+/**
+ * Get keys
+ *
+ * @param {*} pattern
+ * @returns
+ */
+const keys = async pattern => redis.keys(pattern);
 
 /**
  * Set cache value
@@ -62,6 +71,14 @@ const get = async key => {
 };
 
 /**
+ * Get value from key without lock
+ *
+ * return true;
+ * @param {*} key
+ */
+const getWithoutLock = async key => redis.get(key);
+
+/**
  *
  * Get value with TTL
  *
@@ -88,12 +105,12 @@ const del = async key => {
  * @param {*} key
  * @param {*} field
  * @param {*} value
+ * @param {*} ttl
  */
-const hset = async (key, field, value) => {
-  const lock = await redlock.lock(`redlock:${key}:${field}`, 500);
-  const result = await redis.hset(key, field, value);
-  await lock.unlock();
-  return result;
+const hset = async (key, field, value, ttl = undefined) => {
+  const newKey = `${key}:${field}`;
+
+  return set(newKey, value, ttl);
 };
 
 /**
@@ -103,10 +120,9 @@ const hset = async (key, field, value) => {
  * @param {*} field
  */
 const hget = async (key, field) => {
-  const lock = await redlock.lock(`redlock:${key}:${field}`, 500);
-  const result = await redis.hget(key, field);
-  await lock.unlock();
-  return result;
+  const newKey = `${key}:${field}`;
+
+  return get(newKey);
 };
 
 /**
@@ -115,14 +131,46 @@ const hget = async (key, field) => {
  * @param {*} field
  * @returns
  */
-const hgetWithoutLock = async (key, field) => redis.hget(key, field);
+const hgetWithoutLock = async (key, field) => {
+  const newKey = `${key}:${field}`;
+
+  return getWithoutLock(newKey);
+};
 
 /**
  * Get value from key
  *
- * @param {*} key
+ * @param {*} prefix
+ * @param {*} pattern
+ * @param {*} cursor
+ * @param {*} result
  */
-const hgetall = async key => redis.hgetall(key);
+const hgetall = async (prefix, pattern, cursor = '0', result = {}) => {
+  const newResult = result;
+  const reply = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 1000);
+
+  const replyCursor = reply[0];
+  // Retrieve all values
+
+  if (reply[1]) {
+    await Promise.all(
+      reply[1].map(async replyKey => {
+        newResult[replyKey.replace(prefix, '')] = await getWithoutLock(
+          replyKey
+        );
+      })
+    );
+  }
+
+  if (replyCursor === '0') {
+    // no more cursor
+
+    return newResult;
+  }
+
+  // has more cursor
+  return hgetall(prefix, pattern, replyCursor, newResult);
+};
 
 /**
  * Delete key/field
@@ -131,13 +179,39 @@ const hgetall = async key => redis.hgetall(key);
  * @param {*} field
  */
 const hdel = async (key, field) => {
-  const lock = await redlock.lock(`redlock:${key}:${field}`, 500);
-  const result = await redis.hdel(key, field);
-  await lock.unlock();
-  return result;
+  const newKey = `${key}:${field}`;
+  return del(newKey);
+};
+
+/**
+ * Delete all matching keys
+ *
+ * @param {*} pattern
+ * @param {*} cursor
+ * @returns
+ */
+const hdelall = async (pattern, cursor = '0') => {
+  const reply = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 1000);
+
+  const replyCursor = reply[0];
+
+  if (reply[1]) {
+    await Promise.all(reply[1].map(async replyKey => del(replyKey)));
+  }
+
+  if (replyCursor === '0') {
+    // no more cursor
+
+    return true;
+  }
+
+  // has more cursor
+  return hdelall(pattern, replyCursor);
 };
 
 module.exports = {
+  redis,
+  keys,
   set,
   get,
   getWithTTL,
@@ -146,5 +220,6 @@ module.exports = {
   hgetWithoutLock,
   hget,
   hgetall,
-  hdel
+  hdel,
+  hdelall
 };

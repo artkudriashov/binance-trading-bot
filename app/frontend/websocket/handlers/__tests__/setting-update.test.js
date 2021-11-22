@@ -36,6 +36,7 @@ describe('setting-update.test.js', () => {
       cacheMock = cache;
 
       cacheMock.hdel = jest.fn().mockResolvedValue(true);
+      cacheMock.hgetall = jest.fn().mockResolvedValue({});
 
       mockGetGlobalConfiguration = jest.fn().mockResolvedValue(null);
 
@@ -70,6 +71,10 @@ describe('setting-update.test.js', () => {
         cacheMock = cache;
 
         cacheMock.hdel = jest.fn().mockResolvedValue(true);
+        cacheMock.hgetall = jest.fn().mockResolvedValue({
+          'BTCUSDT-symbol-info': JSON.stringify({ some: 'value' }),
+          'ETHUSDT-symbol-info': JSON.stringify({ some: 'value' })
+        });
 
         mockGetGlobalConfiguration = jest.fn().mockResolvedValue({
           enabled: true,
@@ -80,6 +85,7 @@ describe('setting-update.test.js', () => {
           },
           buy: {
             enabled: true,
+            minPurchaseAmount: 50,
             maxPurchaseAmount: 100,
             lastBuyPriceRemoveThreshold: 10
           },
@@ -106,6 +112,7 @@ describe('setting-update.test.js', () => {
             },
             buy: {
               enabled: true,
+              minPurchaseAmount: 100,
               maxPurchaseAmount: 150,
               lastBuyPriceRemoveThreshold: 10
             },
@@ -133,127 +140,7 @@ describe('setting-update.test.js', () => {
           },
           buy: {
             enabled: true,
-            maxPurchaseAmount: -1,
-            lastBuyPriceRemoveThreshold: -1
-          },
-          sell: {
-            enabled: true,
-            lastbuyPercentage: 1.07,
-            stopPercentage: 0.98,
-            limitPercentage: 0.97
-          }
-        });
-      });
-
-      it('triggers cache.hdel', () => {
-        expect(cacheMock.hdel).toHaveBeenCalledWith(
-          'trailing-trade-common',
-          'exchange-symbols'
-        );
-      });
-
-      it('triggers deleteAllSymbolConfiguration', () => {
-        expect(mockDeleteAllSymbolConfiguration).toHaveBeenCalledWith(
-          mockLogger
-        );
-      });
-
-      it('triggers ws.send', () => {
-        expect(mockWebSocketServerWebSocketSend).toHaveBeenCalledWith(
-          JSON.stringify({
-            result: true,
-            type: 'setting-update-result',
-            newConfiguration: {
-              enabled: true,
-              symbols: ['BTCUSDT', 'LTCUSDT', 'ETHBTC'],
-              candles: { interval: '1h', limit: '100' },
-              buy: {
-                enabled: true,
-                maxPurchaseAmount: -1,
-                lastBuyPriceRemoveThreshold: -1
-              },
-              sell: {
-                enabled: true,
-                lastbuyPercentage: 1.07,
-                stopPercentage: 0.98,
-                limitPercentage: 0.97
-              }
-            }
-          })
-        );
-      });
-    });
-
-    describe('when apply to only global', () => {
-      beforeEach(async () => {
-        const { logger, cache } = require('../../../../helpers');
-        mockLogger = logger;
-        cacheMock = cache;
-
-        cacheMock.hdel = jest.fn().mockResolvedValue(true);
-
-        mockGetGlobalConfiguration = jest.fn().mockResolvedValue({
-          enabled: true,
-          symbols: ['BTCUSDT'],
-          candles: {
-            interval: '1d',
-            limit: '10'
-          },
-          buy: {
-            enabled: true,
-            maxPurchaseAmount: 100,
-            lastBuyPriceRemoveThreshold: 10
-          },
-          sell: {
-            enabled: true,
-            lastbuyPercentage: 1.06,
-            stopPercentage: 0.99,
-            limitPercentage: 0.98
-          }
-        });
-
-        mockSaveGlobalConfiguration = jest.fn().mockResolvedValue(true);
-
-        const { handleSettingUpdate } = require('../setting-update');
-        await handleSettingUpdate(logger, mockWebSocketServer, {
-          data: {
-            action: 'apply-to-global-only',
-            enabled: true,
-            symbols: ['BTCUSDT', 'LTCUSDT', 'ETHBTC'],
-            supportFIATs: ['USDT', 'BUSD'],
-            candles: {
-              interval: '1h',
-              limit: '100'
-            },
-            buy: {
-              enabled: true,
-              maxPurchaseAmount: 150,
-              lastBuyPriceRemoveThreshold: 10
-            },
-            sell: {
-              enabled: true,
-              lastbuyPercentage: 1.07,
-              stopPercentage: 0.98,
-              limitPercentage: 0.97
-            }
-          }
-        });
-      });
-
-      it('triggers getGlobalConfiguration', () => {
-        expect(mockGetGlobalConfiguration).toHaveBeenCalledWith(mockLogger);
-      });
-
-      it('triggers saveGlobalConfiguration', () => {
-        expect(mockSaveGlobalConfiguration).toHaveBeenCalledWith(mockLogger, {
-          enabled: true,
-          symbols: ['BTCUSDT', 'LTCUSDT', 'ETHBTC'],
-          candles: {
-            interval: '1h',
-            limit: '100'
-          },
-          buy: {
-            enabled: true,
+            minPurchaseAmount: -1,
             maxPurchaseAmount: -1,
             lastBuyPriceRemoveThreshold: -1
           },
@@ -280,6 +167,164 @@ describe('setting-update.test.js', () => {
         );
       });
 
+      it('triggers cache.hdel for symbols', () => {
+        expect(cacheMock.hdel).toHaveBeenCalledWith(
+          'trailing-trade-symbols',
+          'BTCUSDT-symbol-info'
+        );
+        expect(cacheMock.hdel).toHaveBeenCalledWith(
+          'trailing-trade-symbols',
+          'ETHUSDT-symbol-info'
+        );
+      });
+
+      it('triggers deleteAllSymbolConfiguration', () => {
+        expect(mockDeleteAllSymbolConfiguration).toHaveBeenCalledWith(
+          mockLogger
+        );
+      });
+
+      it('triggers ws.send', () => {
+        expect(mockWebSocketServerWebSocketSend).toHaveBeenCalledWith(
+          JSON.stringify({
+            result: true,
+            type: 'setting-update-result',
+            newConfiguration: {
+              enabled: true,
+              symbols: ['BTCUSDT', 'LTCUSDT', 'ETHBTC'],
+              candles: { interval: '1h', limit: '100' },
+              buy: {
+                enabled: true,
+                minPurchaseAmount: -1,
+                maxPurchaseAmount: -1,
+                lastBuyPriceRemoveThreshold: -1
+              },
+              sell: {
+                enabled: true,
+                lastbuyPercentage: 1.07,
+                stopPercentage: 0.98,
+                limitPercentage: 0.97
+              }
+            }
+          })
+        );
+      });
+    });
+
+    describe('when apply to only global', () => {
+      beforeEach(async () => {
+        const { logger, cache } = require('../../../../helpers');
+        mockLogger = logger;
+        cacheMock = cache;
+
+        cacheMock.hdel = jest.fn().mockResolvedValue(true);
+        cacheMock.hgetall = jest.fn().mockResolvedValue({
+          'BTCUSDT-symbol-info': JSON.stringify({ some: 'value' }),
+          'ETHUSDT-symbol-info': JSON.stringify({ some: 'value' })
+        });
+
+        mockGetGlobalConfiguration = jest.fn().mockResolvedValue({
+          enabled: true,
+          symbols: ['BTCUSDT'],
+          candles: {
+            interval: '1d',
+            limit: '10'
+          },
+          buy: {
+            enabled: true,
+            minPurchaseAmount: 50,
+            maxPurchaseAmount: 100,
+            lastBuyPriceRemoveThreshold: 10
+          },
+          sell: {
+            enabled: true,
+            lastbuyPercentage: 1.06,
+            stopPercentage: 0.99,
+            limitPercentage: 0.98
+          }
+        });
+
+        mockSaveGlobalConfiguration = jest.fn().mockResolvedValue(true);
+
+        const { handleSettingUpdate } = require('../setting-update');
+        await handleSettingUpdate(logger, mockWebSocketServer, {
+          data: {
+            action: 'apply-to-global-only',
+            enabled: true,
+            symbols: ['BTCUSDT', 'LTCUSDT', 'ETHBTC'],
+            supportFIATs: ['USDT', 'BUSD'],
+            candles: {
+              interval: '1h',
+              limit: '100'
+            },
+            buy: {
+              enabled: true,
+              minPurchaseAmount: 100,
+              maxPurchaseAmount: 150,
+              lastBuyPriceRemoveThreshold: 10
+            },
+            sell: {
+              enabled: true,
+              lastbuyPercentage: 1.07,
+              stopPercentage: 0.98,
+              limitPercentage: 0.97
+            }
+          }
+        });
+      });
+
+      it('triggers getGlobalConfiguration', () => {
+        expect(mockGetGlobalConfiguration).toHaveBeenCalledWith(mockLogger);
+      });
+
+      it('triggers saveGlobalConfiguration', () => {
+        expect(mockSaveGlobalConfiguration).toHaveBeenCalledWith(mockLogger, {
+          enabled: true,
+          symbols: ['BTCUSDT', 'LTCUSDT', 'ETHBTC'],
+          candles: {
+            interval: '1h',
+            limit: '100'
+          },
+          buy: {
+            enabled: true,
+            minPurchaseAmount: -1,
+            maxPurchaseAmount: -1,
+            lastBuyPriceRemoveThreshold: -1
+          },
+          sell: {
+            enabled: true,
+            lastbuyPercentage: 1.07,
+            stopPercentage: 0.98,
+            limitPercentage: 0.97
+          }
+        });
+      });
+
+      it('triggers cache.hdel for exchange-symbols', () => {
+        expect(cacheMock.hdel).toHaveBeenCalledWith(
+          'trailing-trade-common',
+          'exchange-symbols'
+        );
+      });
+
+      it('triggers cache.hdel for exchange-info', () => {
+        expect(cacheMock.hdel).toHaveBeenCalledWith(
+          'trailing-trade-common',
+          'exchange-info'
+        );
+      });
+
+      it('triggers cache.hdel for symbols', () => {
+        expect(cacheMock.hdel).toHaveBeenCalledWith(
+          'trailing-trade-symbols',
+          'BTCUSDT-symbol-info'
+        );
+        expect(cacheMock.hdel).toHaveBeenCalledWith(
+          'trailing-trade-symbols',
+          'ETHUSDT-symbol-info'
+        );
+      });
+
       it('does not trigger deleteAllSymbolConfiguration', () => {
         expect(mockDeleteAllSymbolConfiguration).not.toHaveBeenCalledWith(
           mockLogger
@@ -297,6 +342,7 @@ describe('setting-update.test.js', () => {
               candles: { interval: '1h', limit: '100' },
               buy: {
                 enabled: true,
+                minPurchaseAmount: -1,
                 maxPurchaseAmount: -1,
                 lastBuyPriceRemoveThreshold: -1
               },

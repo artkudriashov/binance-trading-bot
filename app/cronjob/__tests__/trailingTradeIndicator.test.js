@@ -1,3 +1,4 @@
+/* eslint-disable max-classes-per-file */
 /* eslint-disable global-require */
 const { logger } = require('../../helpers');
 
@@ -18,6 +19,8 @@ describe('trailingTradeIndicator', () => {
   let mockGetOpenOrders;
   let mockExecuteDustTransfer;
   let mockGetClosedTrades;
+  let mockGetOrderStats;
+  let mockGetTradingView;
   let mockSaveDataToCache;
 
   let mockLockSymbol;
@@ -48,6 +51,134 @@ describe('trailingTradeIndicator', () => {
     }));
   });
 
+  const mockSteps = () => {
+    mockGetGlobalConfiguration = jest
+      .fn()
+      .mockImplementation((_logger, rawData) => ({
+        ...rawData,
+        ...{
+          globalConfiguration: {
+            global: 'configuration data'
+          }
+        }
+      }));
+
+    mockGetNextSymbol = jest.fn().mockImplementation((_logger, rawData) => ({
+      ...rawData,
+      ...{
+        symbol: 'BTCUSDT'
+      }
+    }));
+
+    mockGetSymbolConfiguration = jest
+      .fn()
+      .mockImplementation((_logger, rawData) => ({
+        ...rawData,
+        ...{
+          symbolConfiguration: {
+            symbol: 'configuration data'
+          }
+        }
+      }));
+
+    mockGetSymbolInfo = jest.fn().mockImplementation((_logger, rawData) => ({
+      ...rawData,
+      ...{
+        symbolInfo: {
+          some: 'info'
+        }
+      }
+    }));
+
+    mockGetOverrideAction = jest
+      .fn()
+      .mockImplementation((_logger, rawData) => ({
+        ...rawData,
+        ...{
+          action: 'override-action',
+          overrideParams: { param: 'overrided' }
+        }
+      }));
+
+    mockGetAccountInfo = jest.fn().mockImplementation((_logger, rawData) => ({
+      ...rawData,
+      ...{
+        accountInfo: {
+          account: 'information'
+        }
+      }
+    }));
+
+    mockGetIndicators = jest.fn().mockImplementation((_logger, rawData) => ({
+      ...rawData,
+      ...{
+        indicators: {
+          some: 'value'
+        }
+      }
+    }));
+
+    mockGetOpenOrders = jest.fn().mockImplementation((_logger, rawData) => ({
+      ...rawData,
+      ...{
+        openOrders: [{ orderId: 1 }]
+      }
+    }));
+
+    mockExecuteDustTransfer = jest
+      .fn()
+      .mockImplementation((_logger, rawData) => ({
+        ...rawData,
+        ...{
+          dustTransfer: 'dust-transfer'
+        }
+      }));
+
+    mockGetClosedTrades = jest.fn().mockImplementation((_logger, rawData) => ({
+      ...rawData,
+      ...{
+        getClosedTrades: 'executed'
+      }
+    }));
+
+    mockGetOrderStats = jest.fn().mockImplementation((_logger, rawData) => ({
+      ...rawData,
+      ...{
+        getOrderStats: 'retrieved'
+      }
+    }));
+
+    mockGetTradingView = jest.fn().mockImplementation((_logger, rawData) => ({
+      ...rawData,
+      ...{
+        tradingView: 'retrieved'
+      }
+    }));
+
+    mockSaveDataToCache = jest.fn().mockImplementation((_logger, rawData) => ({
+      ...rawData,
+      ...{
+        saved: 'data-to-cache'
+      }
+    }));
+
+    jest.mock('../trailingTradeIndicator/steps', () => ({
+      getGlobalConfiguration: mockGetGlobalConfiguration,
+      getNextSymbol: mockGetNextSymbol,
+      getSymbolConfiguration: mockGetSymbolConfiguration,
+      getSymbolInfo: mockGetSymbolInfo,
+      getOverrideAction: mockGetOverrideAction,
+      getAccountInfo: mockGetAccountInfo,
+      getIndicators: mockGetIndicators,
+      getOpenOrders: mockGetOpenOrders,
+      executeDustTransfer: mockExecuteDustTransfer,
+      getClosedTrades: mockGetClosedTrades,
+      getOrderStats: mockGetOrderStats,
+      getTradingView: mockGetTradingView,
+      saveDataToCache: mockSaveDataToCache
+    }));
+  };
+
   describe('without any error', () => {
     beforeEach(async () => {
       config.get = jest.fn(key => {
@@ -73,119 +204,7 @@ describe('trailingTradeIndicator', () => {
         getAPILimit: mockGetAPILimit
       }));
 
-      mockGetGlobalConfiguration = jest
-        .fn()
-        .mockImplementation((_logger, rawData) => ({
-          ...rawData,
-          ...{
-            globalConfiguration: {
-              global: 'configuration data'
-            }
-          }
-        }));
-
-      mockGetNextSymbol = jest.fn().mockImplementation((_logger, rawData) => ({
-        ...rawData,
-        ...{
-          symbol: 'BTCUSDT'
-        }
-      }));
-
-      mockGetSymbolConfiguration = jest
-        .fn()
-        .mockImplementation((_logger, rawData) => ({
-          ...rawData,
-          ...{
-            symbolConfiguration: {
-              symbol: 'configuration data'
-            }
-          }
-        }));
-
-      mockGetSymbolInfo = jest.fn().mockImplementation((_logger, rawData) => ({
-        ...rawData,
-        ...{
-          symbolInfo: {
-            some: 'info'
-          }
-        }
-      }));
-
-      mockGetOverrideAction = jest
-        .fn()
-        .mockImplementation((_logger, rawData) => ({
-          ...rawData,
-          ...{
-            action: 'override-action',
-            overrideParams: { param: 'overrided' }
-          }
-        }));
-
-      mockGetAccountInfo = jest.fn().mockImplementation((_logger, rawData) => ({
-        ...rawData,
-        ...{
-          accountInfo: {
-            account: 'information'
-          }
-        }
-      }));
-
-      mockGetIndicators = jest.fn().mockImplementation((_logger, rawData) => ({
-        ...rawData,
-        ...{
-          indicators: {
-            some: 'value'
-          }
-        }
-      }));
-
-      mockGetOpenOrders = jest.fn().mockImplementation((_logger, rawData) => ({
-        ...rawData,
-        ...{
-          openOrders: [{ orderId: 1 }]
-        }
-      }));
-
-      mockExecuteDustTransfer = jest
-        .fn()
-        .mockImplementation((_logger, rawData) => ({
-          ...rawData,
-          ...{
-            dustTransfer: 'dust-transfer'
-          }
-        }));
-
-      mockGetClosedTrades = jest
-        .fn()
-        .mockImplementation((_logger, rawData) => ({
-          ...rawData,
-          ...{
-            getClosedTrades: 'executed'
-          }
-        }));
-
-      mockSaveDataToCache = jest
-        .fn()
-        .mockImplementation((_logger, rawData) => ({
-          ...rawData,
-          ...{
-            saved: 'data-to-cache'
-          }
-        }));
-
-      jest.mock('../trailingTradeIndicator/steps', () => ({
-        getGlobalConfiguration: mockGetGlobalConfiguration,
-        getNextSymbol: mockGetNextSymbol,
-        getSymbolConfiguration: mockGetSymbolConfiguration,
-        getSymbolInfo: mockGetSymbolInfo,
-        getOverrideAction: mockGetOverrideAction,
-        getAccountInfo: mockGetAccountInfo,
-        getIndicators: mockGetIndicators,
-        getOpenOrders: mockGetOpenOrders,
-        executeDustTransfer: mockExecuteDustTransfer,
-        getClosedTrades: mockGetClosedTrades,
-        saveDataToCache: mockSaveDataToCache
-      }));
+      mockSteps();
 
       const {
         execute: trailingTradeIndicatorExecute
@@ -225,6 +244,8 @@ describe('trailingTradeIndicator', () => {
             apiLimit: { start: 10, end: 10 },
             dustTransfer: 'dust-transfer',
             getClosedTrades: 'executed',
+            getOrderStats: 'retrieved',
+            tradingView: 'retrieved',
             saved: 'data-to-cache'
           }
         },
@@ -246,78 +267,7 @@ describe('trailingTradeIndicator', () => {
         getAPILimit: mockGetAPILimit
       }));
 
-      mockGetGlobalConfiguration = jest
-        .fn()
-        .mockImplementation((_logger, rawData) => ({
-          ...rawData,
-          ...{
-            globalConfiguration: {
-              global: 'configuration data'
-            }
-          }
-        }));
-
-      mockGetNextSymbol = jest.fn().mockImplementation((_logger, rawData) => ({
-        ...rawData,
-        ...{
-          symbol: 'BTCUSDT'
-        }
-      }));
-
-      mockGetSymbolConfiguration = jest
-        .fn()
-        .mockImplementation((_logger, rawData) => ({
-          ...rawData,
-          ...{
-            symbolConfiguration: {
-              symbol: 'configuration data'
-            }
-          }
-        }));
-
-      mockGetAccountInfo = jest.fn().mockImplementation((_logger, rawData) => ({
-        ...rawData,
-        ...{
-          accountInfo: {
-            account: 'information'
-          }
-        }
-      }));
-
-      mockGetIndicators = jest.fn().mockImplementation((_logger, rawData) => ({
-        ...rawData,
-        ...{
-          indicators: {
-            some: 'value'
-          }
-        }
-      }));
-
-      mockGetOpenOrders = jest.fn().mockImplementation((_logger, rawData) => ({
-        ...rawData,
-        ...{
-          openOrders: [{ orderId: 1 }]
-        }
-      }));
-
-      mockSaveDataToCache = jest
-        .fn()
-        .mockImplementation((_logger, rawData) => ({
-          ...rawData,
-          ...{
-            saved: 'data-to-cache'
-          }
-        }));
-
-      jest.mock('../trailingTradeIndicator/steps', () => ({
-        getGlobalConfiguration: mockGetGlobalConfiguration,
-        getNextSymbol: mockGetNextSymbol,
-        getSymbolConfiguration: mockGetSymbolConfiguration,
-        getAccountInfo: mockGetAccountInfo,
-        getIndicators: mockGetIndicators,
-        getOpenOrders: mockGetOpenOrders,
-        saveDataToCache: mockSaveDataToCache
-      }));
+      mockSteps();
 
       const {
         execute: trailingTradeIndicatorExecute
@@ -351,23 +301,7 @@ describe('trailingTradeIndicator', () => {
 
   describe('with errors', () => {
     beforeEach(() => {
-      mockGetGlobalConfiguration = jest.fn().mockResolvedValue(true);
-      mockGetNextSymbol = jest.fn().mockResolvedValue(true);
-      mockGetSymbolConfiguration = jest.fn().mockResolvedValue(true);
-      mockGetAccountInfo = jest.fn().mockResolvedValue(true);
-      mockGetIndicators = jest.fn().mockResolvedValue(true);
-      mockGetOpenOrders = jest.fn().mockResolvedValue(true);
-      mockSaveDataToCache = jest.fn().mockResolvedValue(true);
-
-      jest.mock('../trailingTradeIndicator/steps', () => ({
-        getGlobalConfiguration: mockGetGlobalConfiguration,
-        getNextSymbol: mockGetNextSymbol,
-        getSymbolConfiguration: mockGetSymbolConfiguration,
-        getAccountInfo: mockGetAccountInfo,
-        getIndicators: mockGetIndicators,
-        getOpenOrders: mockGetOpenOrders,
-        saveDataToCache: mockSaveDataToCache
-      }));
+      mockSteps();
     });
 
     [
@@ -447,6 +381,36 @@ describe('trailingTradeIndicator', () => {
             expect(mockSlackSendMessage).not.toHaveBeenCalled();
           });
         }
+      });
+    });
+
+    describe(`redlock error`, () => {
+      beforeEach(async () => {
+        mockConfigGet = jest.fn(_key => null);
+
+        jest.mock('config', () => ({
+          get: mockConfigGet
+        }));
+
+        mockGetGlobalConfiguration = jest.fn().mockRejectedValueOnce(
+          new (class CustomError extends Error {
+            constructor() {
+              super();
+              this.code = 500;
+              this.message = `redlock:lock-XRPBUSD`;
+            }
+          })()
+        );
+
+        const {
+          execute: trailingTradeIndicatorExecute
+        } = require('../trailingTradeIndicator');
+
+        await trailingTradeIndicatorExecute(logger);
+      });
+
+      it('does not trigger slack.sendMessagage', () => {
+        expect(mockSlackSendMessage).not.toHaveBeenCalled();
       });
     });
   });

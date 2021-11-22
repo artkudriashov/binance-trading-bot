@@ -1,10 +1,11 @@
 const moment = require('moment');
-const { binance, slack, cache, PubSub } = require('../../../helpers');
+const { binance, slack, PubSub } = require('../../../helpers');
 const {
   getAPILimit,
   getAndCacheOpenOrdersForSymbol,
   getAccountInfoFromAPI
 } = require('../../trailingTradeHelper/common');
+const { deleteManualOrder } = require('../../trailingTradeHelper/order');
 
 /**
  * Cancel order
@@ -41,15 +42,15 @@ const execute = async (logger, rawData) => {
   );
 
   logger.info(
-    { debug: true, function: 'order', orderParams },
-    'Cancel order params'
+    { function: 'order', orderParams, saveLog: true },
+    'The order will be cancelled.'
   );
 
   const orderResult = await binance.client.cancelOrder(orderParams);
 
-  logger.info({ orderResult }, 'Cancelling order result');
+  logger.info({ orderResult, saveLog: true }, 'The order has been cancelled.');
 
-  await cache.hdel(`trailing-trade-manual-order-${symbol}`, order.orderId);
+  await deleteManualOrder(logger, symbol, order.orderId);
 
   // Get open orders and update cache
   data.openOrders = await getAndCacheOpenOrdersForSymbol(logger, symbol);
